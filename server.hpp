@@ -1,6 +1,8 @@
 #include <vector>
 #include <fstream>
 
+using namespace std;
+
 class Server
 {
   public: // later move variables to private (public for ease of testing)
@@ -11,8 +13,27 @@ class Server
     Server()
     {
         // init
+        f_db.open("keydb.txt", ios::app | ios::in);
+        f_log.open("log.txt", ios::app | ios::in);
     }
+
+    ~Server()
+    {
+      f_db.close();
+      f_log.close();
+    }
+
+    // Readers-Writer lock for logfile handling
+    void lock();
+    void unlock();
+
     // declare methods to handle clients
+    void receive();
+    void respond();
 
     // declare methods to service the requests and respond
+    void handle_get(string key);
+    void handle_put(string key, string value);
+    void handle_delete(string key);
+    void write_cache();
 };

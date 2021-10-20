@@ -10,11 +10,31 @@ class Server
     fstream f_db;           // handles the key-value db in persistent storage
     fstream f_log;          // handles the log file
 
+    struct cache_block{
+	string key;
+	string value;
+	int valid;
+	int lru;
+	int lfu;
+	};
+
+    int lru =0,lfu=1;
+    int cache_set=4;    //cache_size/key_value_size;
+    struct cache_block LLC[/*cache_set*/ 64];
+
     Server()
     {
         // init
         f_db.open("keydb.txt", ios::out | ios::app | ios::in);
         f_log.open("log.txt", ios::out | ios::app | ios::in);
+
+    	for(int i=0;i<cache_set;i++)
+        {
+            LLC[i].key='\0';
+            LLC[i].value='\0';
+            LLC[i].lru=-1;
+            LLC[i].lfu=0;
+        }
     }
 
     ~Server()
@@ -46,5 +66,13 @@ class Server
     void handle_get(string key);
     void handle_put(string key, string value);
     void handle_delete(string key);
-    // void write_cache();
+    
+    //Cache 
+    int check_hit(string key);
+    int llc_lru_find_victim();
+    int llc_lfu_find_victim();
+    void llc_lru_update(int index);
+    void llc_lfu_update(int index);
+    void fill_cache(string key,string value);
+    void print_cache();
 };

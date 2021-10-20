@@ -5,6 +5,14 @@
 
 void Server::handle_get(string key)
 {
+    int idx = check_hit(key);
+    if(idx != -1)
+    {
+        string value = LLC[idx].value;
+        // respond here
+        return;
+    }
+
     string line;
     bool found = false;
     while(f_db)
@@ -19,6 +27,7 @@ void Server::handle_get(string key)
             found = true;
             // respond here
             // update cache
+            fill_cache(k, v);
             break;
         }
     }
@@ -29,6 +38,10 @@ void Server::handle_get(string key)
 
 void Server::handle_put(string key, string value)
 {
+    int idx = check_hit(key);
+    if(idx > -1)
+        LLC[idx].value = value;
+
     stringstream conv(key);
     f_db.seekg(0, ios::beg);
     int K;
@@ -78,6 +91,16 @@ void Server::handle_put(string key, string value)
 
 void Server::handle_delete(string key)
 {
+    int idx = check_hit(key);
+    if(idx > -1)
+    {
+        if(lru == 1)
+        {
+            LLC[idx].lru = cache_set-1;
+            llc_lru_update(idx);
+            LLC[idx].valid = 0;
+        }
+    }
     f_db.seekg(0, ios::beg);
     string line;
     bool found = false;

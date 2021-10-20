@@ -3,56 +3,10 @@
 #include <sstream>
 #include <string>
 
-void Server::lock()
-{
-
-}
-
-void Server::unlock()
-{
-
-}
-
-// called when GET()
 void Server::handle_get(string key)
 {
-    lock();
-    // before reading commit all the logs
-    f_log.seekg(0, ios::beg);
-    while(f_log)
-    {
-        getline(f_log, line);
-        stringstream getVal(line);
-        string m, k, v, i;
-        getVal>>m;
-        getVal>>k;
-        getVal>>v;
-        getVal>>i;
-
-        if(m=="PUT")
-        {
-            // find line to write at
-            // write there
-            // remove log entry
-        }
-        else if(m=="DEL")
-        {
-            // go to line where deletion has to be done
-            // delete the line
-            // remove log entry
-        }
-        else
-        {
-
-        }
-    }
-    unlock();
-
     string line;
-
-    f_db.seekg(0, ios::beg);
-
-    // reading db line by line
+    bool found = false;
     while(f_db)
     {
         getline(f_db, line);
@@ -61,78 +15,94 @@ void Server::handle_get(string key)
         getVal>>k;
         getVal>>v;
         if(key==k)
+        {
+            found = true;
+            // respond here
+            // update cache
             break;
+        }
     }
 
-    // push k-v to cache
-    // write_cache();
-
-    // respond with the v.
-
+    if(!found)
+        cout<<"KEY NOT FOUND!"<<endl;
 }
 
 void Server::handle_put(string key, string value)
 {
-    if(bitmap.size()==0)
+    stringstream conv(key);
+    f_db.seekg(0, ios::beg);
+    int K;
+    conv>>K;
+    string line;
+    bool written = false;
+    bool isEmpty = f_db.peek() == EOF;
+    string newl = key + " " + value;
+    if(isEmpty)
     {
-        cout<<"DB is empty!"<<endl;
+        f_db.seekg(0, ios::beg);
+        f_db<<newl<<endl;
         return;
     }
 
-    // check bitmap and update it
-    int idx=0;
-    for(idx=0; idx<bitmap.size(); idx++)
+    ofstream newdb;
+    newdb.open("temp.txt", ofstream::out);
+
+    while(getline(f_db, line))
     {
-        if(!bitmap[idx])
-            break;
+        stringstream getVals(line);
+        int k;
+        getVals>>k;
+        if(k < K)
+            newdb<<line<<endl;
+        else if(k > K)
+        {
+            if(!written)
+            {
+                newdb<<newl<<endl;
+                written = true;
+            }
+
+            newdb<<line<<endl;
+        }
     }
 
-    if(idx==bitmap.size())
-        bitmap.push_back(false);
-    else
-        bitmap[idx] = false;
+    if(!written)
+        newdb<<newl<<endl;
 
-    lock();
-    // add entry in log
-    f_log.seekg(0, ios::beg);
-    string line = "PUT " + key + " " + value + " " + to_string(idx);
-    f_log<<line<<endl;
-    unlock();
+    newdb.close();
+    f_db.close();
+    remove("keydb.txt");
+    rename("temp.txt", "keydb.txt");
+    f_db.open("keydb.txt", ios::out | ios::app | ios::in);
 }
 
 void Server::handle_delete(string key)
 {
-    if(bitmap.size()==0)
-    {
-        cout<<"DB is empty!"<<endl;
-        return;
-    }
-
-    int idx=0;
-    string line;
     f_db.seekg(0, ios::beg);
-    while(f_db)
+    string line;
+    bool found = false;
+    ofstream newdb;
+    newdb.open("temp.txt", ofstream::out);
+    while(getline(f_db, line))
     {
-        getline(f_db, line);
-        stringstream getVal(line);
-        string k, v;
-        getVal>>k;
-        getVal>>v;
-        if(key==k)
-        {
-            lock();
-            // add entry in log
-            f_log.seekg(0, ios::beg);
-            string line = "DEL " + key + " " + to_string(idx);
-            f_log<<line<<endl;
-            unlock();
-            break;
-        }
-        idx++;
+        stringstream getVals(line);
+        string k;
+        getVals>>k;
+        if(k != key)
+            newdb<<line<<endl;
+        else
+            found = true;
+        
     }
 
-    if(idx==bitmap.size())
-        cout<<"Key: "<<key<<" was not found!"<<endl;
+    if(!found)
+        cout<<"KEY NOT FOUND!"<<endl;
+
+    newdb.close();
+    f_db.close();
+    remove("keydb.txt");
+    rename("temp.txt", "keydb.txt");
+    f_db.open("keydb.txt", ios::out | ios::app | ios::in);
 }
 
 int main()
@@ -144,7 +114,17 @@ int main()
 
     Server sr;
 
-    sr.handle_get(key);
+    sr.handle_put("1", "100");
+    sr.handle_delete("1");
+    sr.handle_put("2", "100");
+    sr.handle_delete("2");
+    sr.handle_put("2", "200");
+    sr.handle_put("4", "100");
+    sr.handle_put("3", "100");
+    // sr.handle_get("1");
+    // sr.handle_get("3");
+    sr.handle_delete("3");
+    sr.handle_delete("4");
 
     return 0;
 }

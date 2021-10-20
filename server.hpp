@@ -1,3 +1,5 @@
+#include <set>
+#include <map>
 #include <vector>
 #include <fstream>
 
@@ -9,7 +11,11 @@ class Server
     vector<bool> bitmap;    // keeps track of empty lines to handle the PUT request
     fstream f_db;           // handles the key-value db in persistent storage
     fstream f_log;          // handles the log file
+    map<int, uint64_t> table;   // stores offset for keys
+    map<int, int> linesizes;    // stores line size for keys
+    set<int> keys;              // stores keys
 
+    // cache block structure
     struct cache_block{
 	string key;
 	string value;

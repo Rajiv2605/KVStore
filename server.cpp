@@ -18,17 +18,18 @@ void Server::handle_get(string key)
     stringstream ss(key);
     int K;
     ss>>K;
-    auto pos = keys.find(K);
-    if(pos==keys.end())
+    int kidx = K%10;
+    auto pos = keys[kidx].find(K);
+    if(pos==keys[kidx].end())
     {
         cout<<"KEY NOT FOUND!"<<endl;
         return;
     }
 
-    int offs = table[K];
-    f_db.seekp(offs, ios::beg);
+    int offs = table[kidx][K];
+    f_db[kidx].seekp(offs, ios::beg);
     string line;
-    getline(f_db, line);
+    getline(f_db[kidx], line);
     stringstream getVal(line);
     string k, v;
     getVal>>k;
@@ -41,6 +42,12 @@ void Server::handle_get(string key)
 void Server::handle_put(string key, string value)
 {
     int idx = check_hit(key);
+    for(int i=0; i<cache_set; i++)
+        if(LLC[i].key==key)
+        {
+            idx = i;
+            break;
+        }
     if(idx > -1)
     {
         LLC[idx].value = value;
@@ -48,21 +55,22 @@ void Server::handle_put(string key, string value)
     }
 
     stringstream conv(key);
-    f_db.seekg(0, ios::beg);
     int K;
     conv>>K;
+    int kidx = K%10;
     string line;
+    f_db[kidx].seekg(0, ios::beg);
     bool written = false;
-    bool isEmpty = f_db.peek() == EOF;
+    // bool isEmpty = f_db.peek() == EOF;
     string newl = key + " " + value;
-    if(isEmpty)
+    if(isEmpty[kidx])
     {
-        f_db.seekg(0, ios::beg);
-        f_db<<newl<<endl;
-        table[K] = 0;
-        keys.insert(K);
-        linesizes[K] = newl.size();
-
+        f_db[kidx].seekg(0, ios::beg);
+        f_db[kidx]<<newl<<endl;
+        table[kidx][K] = 0;
+        keys[kidx].insert(K);
+        linesizes[kidx][K] = newl.size();
+        isEmpty[kidx] = false;
         return;
     }
 
@@ -71,14 +79,14 @@ void Server::handle_put(string key, string value)
 
     // check if the key is already present in the DB
     bool isPresent = false;
-    for(auto i=keys.begin(); i!=keys.end(); i++)
+    for(auto i=keys[kidx].begin(); i!=keys[kidx].end(); i++)
         if(*i==K)
         {
             isPresent = true;
             break;
         }
 
-    while(getline(f_db, line))
+    while(getline(f_db[kidx], line))
     {
         stringstream getVals(line);
         int k;
@@ -99,23 +107,23 @@ void Server::handle_put(string key, string value)
                 {   
                     // cout<<"Inserting new: "<<K<<endl;
                     int maxkey=-1;
-                    for(auto x = keys.begin(); x != keys.end(); x++)
+                    for(auto x = keys[kidx].begin(); x != keys[kidx].end(); x++)
                     {
                         if(*x > K)
                             break;
                         maxkey = *x;
                     }
                     if(maxkey == -1)
-                        table[K] = 0;
+                        table[kidx][K] = 0;
                     else
-                        table[K] = table[maxkey] + linesizes[maxkey] + 1;
+                        table[kidx][K] = table[kidx][maxkey] + linesizes[kidx][maxkey] + 1;
                 }
             }
 
             newdb<<line<<endl;
             // update offsets here with newline.sze() + 1
             if(!isPresent)
-                table[k] += newl.size() + 1;
+                table[kidx][k] += newl.size() + 1;
         }
     }
 
@@ -126,22 +134,23 @@ void Server::handle_put(string key, string value)
         if(!isPresent)
         {
             int maxkey;
-            for(auto x = keys.begin(); x != keys.end(); x++)
+            for(auto x = keys[kidx].begin(); x != keys[kidx].end(); x++)
             {
                 if(*x > K)
                     break;
                 maxkey = *x;
             }
-            table[K] = table[maxkey] + linesizes[maxkey] + 1;
+            table[kidx][K] = table[kidx][maxkey] + linesizes[kidx][maxkey] + 1;
         }
     }
-    keys.insert(K);
-    linesizes[K] = newl.size();
+    keys[kidx].insert(K);
+    linesizes[kidx][K] = newl.size();
     newdb.close();
-    f_db.close();
-    remove("keydb.txt");
-    rename("temp.txt", "keydb.txt");
-    f_db.open("keydb.txt", ios::out | ios::app | ios::in);
+    f_db[kidx].close();
+    string dbfname = "keydb" + to_string(kidx) + ".txt";
+    remove(dbfname.c_str());
+    rename("temp.txt", dbfname.c_str());
+    f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
 }
 
 void Server::handle_delete(string key)
@@ -154,7 +163,8 @@ void Server::handle_delete(string key)
     stringstream ss(key);
     int K;
     ss>>K;
-    for(auto i=keys.begin(); i!=keys.end(); i++)
+    int kidx = K%10;
+    for(auto i=keys[kidx].begin(); i!=keys[kidx].end(); i++)
         if(*i==K)
         {
             found = true;
@@ -167,25 +177,25 @@ void Server::handle_delete(string key)
     }
 
     // remove entries
-    table.erase(K);
-    int lsz = linesizes[K]+1;
-    linesizes.erase(K);
+    table[kidx].erase(K);
+    int lsz = linesizes[kidx][K]+1;
+    linesizes[kidx].erase(K);
     set<int>::iterator i;
-    for(i=keys.begin(); i!=keys.end(); i++)
+    for(i=keys[kidx].begin(); i!=keys[kidx].end(); i++)
         if(*i==K)
             break;
-    keys.erase(i);
-    for(map<int, uint64_t>::iterator i=table.begin(); i!=table.end(); i++)
+    keys[kidx].erase(i);
+    for(map<int, uint64_t>::iterator i=table[kidx].begin(); i!=table[kidx].end(); i++)
     {
         if(i->first > K)
             i->second -= lsz;
     }
 
-    f_db.seekg(0, ios::beg);
+    f_db[kidx].seekg(0, ios::beg);
     string line;
     ofstream newdb;
     newdb.open("temp.txt", ofstream::out);
-    while(getline(f_db, line))
+    while(getline(f_db[kidx], line))
     {
         stringstream getVals(line);
         string k;
@@ -195,10 +205,11 @@ void Server::handle_delete(string key)
     }
 
     newdb.close();
-    f_db.close();
-    remove("keydb.txt");
-    rename("temp.txt", "keydb.txt");
-    f_db.open("keydb.txt", ios::out | ios::app | ios::in);
+    f_db[kidx].close();
+    string dbfname = "keydb" + to_string(kidx) + ".txt";
+    remove(dbfname.c_str());
+    rename("temp.txt", dbfname.c_str());
+    f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
 }
 
 // int main()

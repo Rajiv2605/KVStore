@@ -11,4 +11,4 @@ cache.o: cache.cpp server.hpp
 	g++ -c cache.cpp
 
 clean:
-	rm *.o output
+	rm *.o server

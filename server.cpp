@@ -5,13 +5,13 @@
 
 void Server::handle_get(string key)
 {
-    // int idx = check_hit(key);
-    // if(idx != -1)
-    // {
-    //     string value = LLC[idx].value;
-    //     // respond here
-    //     return;
-    // }
+    int idx = check_hit(key);
+    if(idx != -1)
+    {
+        string value = LLC[idx].value;
+        // respond here
+        return;
+    }
 
     // binary search on keys
     stringstream ss(key);
@@ -25,8 +25,6 @@ void Server::handle_get(string key)
     }
 
     int offs = table[K];
-    // cout<<"Offset: "<<offs<<endl;
-    // f_db.seekp(0, ios::beg);
     f_db.seekp(offs, ios::beg);
     string line;
     getline(f_db, line);
@@ -34,33 +32,16 @@ void Server::handle_get(string key)
     string k, v;
     getVal>>k;
     getVal>>v;
-    cout<<"Value: "<<v<<endl;
-
-    // string line;
-    // bool found = false;
-    // while(f_db)
-    // {
-    //     getline(f_db, line);
-    //     stringstream getVal(line);
-    //     string k, v;
-    //     getVal>>k;
-    //     getVal>>v;
-    //     if(key==k)
-    //     {
-    //         found = true;
-    //         // respond here
-    //         // update cache
-    //         // fill_cache(k, v);
-    //         break;
-    //     }
-    // }
+    cout<<"value: "<<v<<endl;
+    // respond here
+    fill_cache(k, v);
 }
 
 void Server::handle_put(string key, string value)
 {
-    // int idx = check_hit(key);
-    // if(idx > -1)
-    //     LLC[idx].value = value;
+    int idx = check_hit(key);
+    if(idx > -1)
+        LLC[idx].value = value;
 
     stringstream conv(key);
     f_db.seekg(0, ios::beg);
@@ -77,8 +58,7 @@ void Server::handle_put(string key, string value)
         table[K] = 0;
         keys.insert(K);
         linesizes[K] = newl.size();
-        // for(auto i=table.begin(); i!=table.end(); i++)
-        //     cout<<i->first<<" "<<i->second<<endl;
+
         return;
     }
 
@@ -149,7 +129,6 @@ void Server::handle_put(string key, string value)
                 maxkey = *x;
             }
             table[K] = table[maxkey] + linesizes[maxkey] + 1;
-            // cout<<""<<K<<" "<<table[K]<<" "<<maxkey<<" "<<table[maxkey]<<" "<<linesizes[maxkey]<<endl;
         }
     }
     keys.insert(K);
@@ -163,16 +142,16 @@ void Server::handle_put(string key, string value)
 
 void Server::handle_delete(string key)
 {
-    // int idx = check_hit(key);
-    // if(idx > -1)
-    // {
-    //     if(lru == 1)
-    //     {
-    //         LLC[idx].lru = cache_set-1;
-    //         llc_lru_update(idx);
-    //         LLC[idx].valid = 0;
-    //     }
-    // }
+    int idx = check_hit(key);
+    if(idx > -1)
+    {
+        if(lru == 1)
+        {
+            LLC[idx].lru = cache_set-1;
+            llc_lru_update(idx);
+            LLC[idx].valid = 0;
+        }
+    }
 
     bool found = false;
     stringstream ss(key);
@@ -223,36 +202,4 @@ void Server::handle_delete(string key)
     remove("keydb.txt");
     rename("temp.txt", "keydb.txt");
     f_db.open("keydb.txt", ios::out | ios::app | ios::in);
-}
-
-int main()
-{
-    // WRITE PARSER
-    
-    // sample received string
-    string s, key, method;
-
-    Server sr;
-    sr.handle_put("5", "500");
-    sr.handle_put("4", "400");
-    sr.handle_put("3", "300");
-    sr.handle_put("1", "100");
-
-    sr.handle_delete("1");
-    sr.handle_put("2", "100");
-    sr.handle_delete("2");
-    sr.handle_put("2", "200");
-
-    // sr.handle_delete("4");
-    sr.handle_get("1");
-    sr.handle_get("3");
-    sr.handle_get("2");
-    sr.handle_get("4");
-    sr.handle_get("5");
-    // sr.handle_delete("13");
-
-    // for(auto i=sr.table.begin(); i!=sr.table.end(); i++)
-    //     cout<<i->first<<" "<<i->second<<endl;
-
-    return 0;
 }

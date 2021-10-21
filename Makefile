@@ -1,5 +1,8 @@
-output: server.o cache.o
-	g++ server.o cache.o -o output
+server: main.o server.o cache.o
+	g++ main.o server.o cache.o -o server
+
+main.o: main.cpp
+	g++ -c main.cpp
 
 server.o: server.cpp server.hpp
 	g++ -c server.cpp

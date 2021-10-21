@@ -42,7 +42,10 @@ void Server::handle_put(string key, string value)
 {
     int idx = check_hit(key);
     if(idx > -1)
+    {
         LLC[idx].value = value;
+        LLC[idx].valid = 1;
+    }
 
     stringstream conv(key);
     f_db.seekg(0, ios::beg);
@@ -145,14 +148,7 @@ void Server::handle_delete(string key)
 {
     int idx = check_hit(key);
     if(idx > -1)
-    {
-        if(lru == 1)
-        {
-            LLC[idx].lru = cache_set-1;
-            llc_lru_update(idx);
-            LLC[idx].valid = 0;
-        }
-    }
+        LLC[idx].valid = 0;
 
     bool found = false;
     stringstream ss(key);

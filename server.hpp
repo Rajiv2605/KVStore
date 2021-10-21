@@ -32,7 +32,7 @@ class Server
     {
         // init
         f_db.open("keydb.txt", ios::out | ios::app | ios::in);
-        f_log.open("log.txt", ios::out | ios::app | ios::in);
+        // f_log.open("log.txt", ios::out | ios::app | ios::in);
 
     	for(int i=0;i<cache_set;i++)
         {

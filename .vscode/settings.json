@@ -1,5 +1,6 @@
 {
     "files.associations": {
+<<<<<<< HEAD
         "*.inc": "cpp",
         "any": "cpp",
         "array": "cpp",
@@ -71,5 +72,10 @@
         "valarray": "cpp",
         "variant": "cpp",
         "bit": "cpp"
+=======
+        "ostream": "cpp",
+        "iosfwd": "cpp",
+        "*.tcc": "cpp"
+>>>>>>> da0f0c72fa900dfc6e29e9c07b947fc180a4e5db
     }
 }

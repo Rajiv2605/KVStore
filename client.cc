@@ -22,13 +22,15 @@ using keyvalue::KeyValueReply;
 using keyvalue::KeyValueRequest;
 using keyvalue::KVStore;
 
+using namespace std;
+
 class KVStoreClient
 {
 public:
-    explicit KVStoreClient(std::shared_ptr<Channel> channel)
+    explicit KVStoreClient(shared_ptr<Channel> channel)
         : stub_(KVStore::NewStub(channel)) {}
 
-    void GetKey(const std::string &key)
+    void GetKey(const string &key)
     {
         KeyRequest request;
         request.set_key(key);
@@ -43,7 +45,7 @@ public:
         call->response_reader->Finish(&call->reply, &call->status, (void *)call);
     }
 
-    void PutKey(const std::string &key, const std::string &value)
+    void PutKey(const string &key, const string &value)
     {
         KeyValueRequest request;
         request.set_key(key);
@@ -58,7 +60,7 @@ public:
         call->response_reader->Finish(&call->reply, &call->status, (void *)call);
     }
 
-    void DeleteKey(const std::string &key)
+    void DeleteKey(const string &key)
     {
         KeyRequest request;
         request.set_key(key);
@@ -84,9 +86,9 @@ public:
             GPR_ASSERT(ok);
 
             if (call->status.ok())
-                std::cout << "Success: " << call->reply.key() << std::endl;
+                cout << "Success: " << call->reply.key() << endl;
             else
-                std::cout << "RPC failed" << std::endl;
+                cout << "RPC failed" << endl;
 
             delete call;
         }
@@ -98,10 +100,10 @@ private:
         KeyValueReply reply;
         ClientContext context;
         Status status;
-        std::unique_ptr<ClientAsyncResponseReader<KeyValueReply>> response_reader;
+        unique_ptr<ClientAsyncResponseReader<KeyValueReply>> response_reader;
     };
 
-    std::unique_ptr<KVStore::Stub> stub_;
+    unique_ptr<KVStore::Stub> stub_;
     CompletionQueue cq_;
 };
 
@@ -110,19 +112,19 @@ int main(int argc, char **argv)
     KVStoreClient kvStore(grpc::CreateChannel(
         "localhost:50051", grpc::InsecureChannelCredentials()));
 
-    std::thread thread_ = std::thread(&KVStoreClient::AsyncCompleteRpc, &kvStore);
+    thread thread_ = thread(&KVStoreClient::AsyncCompleteRpc, &kvStore);
 
     for (int i = 0; i < 100; i++)
     {
-        std::string key(" Client_request: " + std::to_string(i));
+        string key(" Client_request: " + to_string(i));
         kvStore.GetKey(key); // The actual RPC call!
         kvStore.PutKey(key, key); // The actual RPC call!
         kvStore.DeleteKey(key); // The actual RPC call!
         
     }
     
-    std::cout << "Press control-c to quit" << std::endl
-              << std::endl;
+    cout << "Press control-c to quit" << endl
+              << endl;
     thread_.join(); // blocks forever
 
     return 0;

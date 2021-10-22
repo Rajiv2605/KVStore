@@ -21,15 +21,12 @@ GRPC_CPP_PLUGIN_PATH ?= `which $(GRPC_CPP_PLUGIN)`
 
 PROTOS_PATH = ./
 
-all: client server 
-# all:
-# 	protoc -I ./ --grpc_out=. --plugin=protoc-gen-grpc=/usr/local/bin/grpc_cpp_plugin keyvalue.proto
-# 	protoc -I ./ --cpp_out=. keyvalue.proto
+all: client server
 
 client: keyvalue.pb.o keyvalue.grpc.pb.o client.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
-server: keyvalue.pb.o keyvalue.grpc.pb.o server.o
+server: keyvalue.pb.o keyvalue.grpc.pb.o server.o storage.o cache.o
 	$(CXX) $^ $(LDFLAGS) -o $@
 
 %.grpc.pb.cc: %.proto
@@ -38,5 +35,12 @@ server: keyvalue.pb.o keyvalue.grpc.pb.o server.o
 %.pb.cc: %.proto
 	$(PROTOC) -I $(PROTOS_PATH) --cpp_out=. $<
 
+
+storage.o: storage.cpp storage.hpp
+	g++ -c storage.cpp
+
+cache.o: cache.cpp storage.hpp
+	g++ -c cache.cpp
+
 clean:
-	rm -f *.o *.pb.cc *.pb.h client server 
+	rm -f *.o *.pb.cc *.pb.h client server storage

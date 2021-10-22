@@ -7,6 +7,8 @@
 #include <grpcpp/grpcpp.h>
 #include "keyvalue.grpc.pb.h"
 
+#define THREADPOOL_SIZE 4
+
 using grpc::Server;
 using grpc::ServerAsyncResponseWriter;
 using grpc::ServerBuilder;
@@ -24,7 +26,8 @@ public:
     ~ServerImpl()
     {
         server_->Shutdown();
-        cq_->Shutdown();
+        for (int i = 0; i < THREADPOOL_SIZE; i++)
+            cq_[i]->Shutdown();
     }
     void Run()
     {
@@ -33,11 +36,19 @@ public:
         ServerBuilder builder;
         builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
         builder.RegisterService(&service_);
-        cq_ = builder.AddCompletionQueue();
+
+        for (int i = 0; i < THREADPOOL_SIZE; i++)
+            cq_[i] = builder.AddCompletionQueue();
+
         server_ = builder.BuildAndStart();
         std::cout << "Server listening on " << server_address << std::endl;
 
-        HandleRpcs();
+        a = 10;
+        std::vector<std::thread> worker_threads;
+        for (int i = 0; i < THREADPOOL_SIZE; ++i)
+            worker_threads.push_back(std::thread(&ServerImpl::HandleRpcs, this, i));
+        for (auto i{0}; i < worker_threads.size(); i++)
+            worker_threads[i].join();
     }
 
 private:
@@ -50,8 +61,8 @@ private:
     class GetKeyFunc final : public CallData
     {
     public:
-        GetKeyFunc(KVStore::AsyncService *service, ServerCompletionQueue *cq)
-            : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE)
+        GetKeyFunc(KVStore::AsyncService *service, ServerCompletionQueue *cq, int thread_id_)
+            : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE), thread_id(thread_id_)
         {
             Proceed();
         }
@@ -67,12 +78,11 @@ private:
             else if (status_ == PROCESS)
             {
                 //new client
-                new GetKeyFunc(service_, cq_);
+                new GetKeyFunc(service_, cq_, thread_id);
 
                 // The actual processing.
-                std::string prefix("From Server GET ");
-                reply_.set_key(prefix + request_.key());
-                std::cout << reply_.key() << std::endl;
+                std::string prefix("Method: GET, Server_thread: ");
+                reply_.set_key(prefix + std::to_string(thread_id) + request_.key());
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -92,6 +102,8 @@ private:
         KeyRequest request_;
         KeyValueReply reply_;
 
+        int thread_id;
+
         ServerAsyncResponseWriter<KeyValueReply> responder_;
 
         enum CallStatus
@@ -106,8 +118,8 @@ private:
     class PutKeyFunc final : public CallData
     {
     public:
-        PutKeyFunc(KVStore::AsyncService *service, ServerCompletionQueue *cq)
-            : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE)
+        PutKeyFunc(KVStore::AsyncService *service, ServerCompletionQueue *cq, int thread_id_)
+            : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE), thread_id(thread_id_)
         {
             Proceed();
         }
@@ -123,12 +135,11 @@ private:
             else if (status_ == PROCESS)
             {
                 //new client
-                new PutKeyFunc(service_, cq_);
+                new PutKeyFunc(service_, cq_, thread_id);
 
                 // The actual processing.
-                std::string prefix("From Server PUT ");
-                reply_.set_key(prefix + request_.key());
-                std::cout << reply_.key() << std::endl;
+                std::string prefix("Method: PUT, Server_thread: ");
+                reply_.set_key(prefix + std::to_string(thread_id) + request_.key());
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -148,6 +159,7 @@ private:
         KeyValueRequest request_;
         KeyValueReply reply_;
 
+        int thread_id;
         ServerAsyncResponseWriter<KeyValueReply> responder_;
 
         enum CallStatus
@@ -162,8 +174,8 @@ private:
     class DeleteKeyFunc final : public CallData
     {
     public:
-        DeleteKeyFunc(KVStore::AsyncService *service, ServerCompletionQueue *cq)
-            : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE)
+        DeleteKeyFunc(KVStore::AsyncService *service, ServerCompletionQueue *cq, int thread_id_)
+            : service_(service), cq_(cq), responder_(&ctx_), status_(CREATE), thread_id(thread_id_)
         {
             Proceed();
         }
@@ -179,12 +191,11 @@ private:
             else if (status_ == PROCESS)
             {
                 //new client
-                new DeleteKeyFunc(service_, cq_);
+                new DeleteKeyFunc(service_, cq_, thread_id);
 
                 // The actual processing.
-                std::string prefix("From Server DELETE ");
-                reply_.set_key(prefix + request_.key());
-                std::cout << reply_.key() << std::endl;
+                std::string prefix("Method: DELETE, Server_thread: ");
+                reply_.set_key(prefix + std::to_string(thread_id) + request_.key());
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -204,6 +215,7 @@ private:
         KeyRequest request_;
         KeyValueReply reply_;
 
+        int thread_id;
         ServerAsyncResponseWriter<KeyValueReply> responder_;
 
         enum CallStatus
@@ -216,26 +228,27 @@ private:
     };
 
     // This can be run in multiple threads if needed.
-    void HandleRpcs()
+    void HandleRpcs(int thread_id)
     {
-        new GetKeyFunc(&service_, cq_.get());
-        new PutKeyFunc(&service_, cq_.get());
-        new DeleteKeyFunc(&service_, cq_.get());
+        new GetKeyFunc(&service_, cq_[thread_id].get(), thread_id);
+        new PutKeyFunc(&service_, cq_[thread_id].get(), thread_id);
+        new DeleteKeyFunc(&service_, cq_[thread_id].get(), thread_id);
 
         void *tag;
         bool ok;
         while (true)
         {
-            std::cout << "In Handle\n";
-            GPR_ASSERT(cq_->Next(&tag, &ok));
+            // std::cout << "In Handle " << thread_id << std::endl;
+            GPR_ASSERT(cq_[thread_id]->Next(&tag, &ok));
             GPR_ASSERT(ok);
             static_cast<CallData *>(tag)->Proceed();
         }
     }
 
-    std::unique_ptr<ServerCompletionQueue> cq_;
+    std::unique_ptr<ServerCompletionQueue> cq_[THREADPOOL_SIZE];
     KVStore::AsyncService service_;
     std::unique_ptr<Server> server_;
+    int a;
 };
 
 int main(int argc, char **argv)

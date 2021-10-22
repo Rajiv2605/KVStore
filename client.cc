@@ -1,6 +1,7 @@
 #include <iostream>
 #include <memory>
 #include <string>
+#include <thread>
 
 #include <grpc/support/log.h>
 #include <grpcpp/grpcpp.h>
@@ -27,129 +28,102 @@ public:
     explicit KVStoreClient(std::shared_ptr<Channel> channel)
         : stub_(KVStore::NewStub(channel)) {}
 
-    std::string GetKey(const std::string &user)
+    void GetKey(const std::string &key)
     {
         KeyRequest request;
-        request.set_key(user);
+        request.set_key(key);
 
-        KeyValueReply reply;
+        AsyncClientCall *call = new AsyncClientCall;
 
-        ClientContext context;
+        call->response_reader =
+            stub_->PrepareAsyncGetKey(&call->context, request, &cq_);
 
-        CompletionQueue cq;
+        call->response_reader->StartCall();
 
-        Status status;
-
-        std::unique_ptr<ClientAsyncResponseReader<KeyValueReply>> rpc(
-            stub_->PrepareAsyncGetKey(&context, request, &cq));
-
-        rpc->StartCall();
-
-        rpc->Finish(&reply, &status, (void *)1);
-        void *got_tag;
-        bool ok = false;
-        GPR_ASSERT(cq.Next(&got_tag, &ok));
-
-        GPR_ASSERT(got_tag == (void *)1);
-        GPR_ASSERT(ok);
-
-        if (status.ok())
-        {
-            return reply.key();
-        }
-        else
-        {
-            return "RPC failed";
-        }
+        call->response_reader->Finish(&call->reply, &call->status, (void *)call);
     }
 
-    std::string PutKey(const std::string &user)
+    void PutKey(const std::string &key, const std::string &value)
     {
         KeyValueRequest request;
-        request.set_key(user);
+        request.set_key(key);
 
-        KeyValueReply reply;
+        AsyncClientCall *call = new AsyncClientCall;
 
-        ClientContext context;
+        call->response_reader =
+            stub_->PrepareAsyncPutKey(&call->context, request, &cq_);
 
-        CompletionQueue cq;
+        call->response_reader->StartCall();
 
-        Status status;
-
-        std::unique_ptr<ClientAsyncResponseReader<KeyValueReply>> rpc(
-            stub_->PrepareAsyncPutKey(&context, request, &cq));
-
-        rpc->StartCall();
-
-        rpc->Finish(&reply, &status, (void *)1);
-        void *got_tag;
-        bool ok = false;
-        GPR_ASSERT(cq.Next(&got_tag, &ok));
-
-        GPR_ASSERT(got_tag == (void *)1);
-        GPR_ASSERT(ok);
-
-        if (status.ok())
-        {
-            return reply.key();
-        }
-        else
-        {
-            return "RPC failed";
-        }
+        call->response_reader->Finish(&call->reply, &call->status, (void *)call);
     }
 
-    std::string DeleteKey(const std::string &user)
+    void DeleteKey(const std::string &key)
     {
         KeyRequest request;
-        request.set_key(user);
+        request.set_key(key);
 
-        KeyValueReply reply;
+        AsyncClientCall *call = new AsyncClientCall;
 
-        ClientContext context;
+        call->response_reader =
+            stub_->PrepareAsyncDeleteKey(&call->context, request, &cq_);
 
-        CompletionQueue cq;
+        call->response_reader->StartCall();
 
-        Status status;
+        call->response_reader->Finish(&call->reply, &call->status, (void *)call);
+    }
 
-        std::unique_ptr<ClientAsyncResponseReader<KeyValueReply>> rpc(
-            stub_->PrepareAsyncDeleteKey(&context, request, &cq));
-
-        rpc->StartCall();
-
-        rpc->Finish(&reply, &status, (void *)1);
+    void AsyncCompleteRpc()
+    {
         void *got_tag;
         bool ok = false;
-        GPR_ASSERT(cq.Next(&got_tag, &ok));
 
-        GPR_ASSERT(got_tag == (void *)1);
-        GPR_ASSERT(ok);
+        while (cq_.Next(&got_tag, &ok))
+        {
+            AsyncClientCall *call = static_cast<AsyncClientCall *>(got_tag);
+            GPR_ASSERT(ok);
 
-        if (status.ok())
-        {
-            return reply.key();
-        }
-        else
-        {
-            return "RPC failed";
+            if (call->status.ok())
+                std::cout << "Success: " << call->reply.key() << std::endl;
+            else
+                std::cout << "RPC failed" << std::endl;
+
+            delete call;
         }
     }
 
 private:
+    struct AsyncClientCall
+    {
+        KeyValueReply reply;
+        ClientContext context;
+        Status status;
+        std::unique_ptr<ClientAsyncResponseReader<KeyValueReply>> response_reader;
+    };
+
     std::unique_ptr<KVStore::Stub> stub_;
+    CompletionQueue cq_;
 };
 
 int main(int argc, char **argv)
 {
     KVStoreClient kvStore(grpc::CreateChannel(
         "localhost:50051", grpc::InsecureChannelCredentials()));
-    std::string user("world");
-    std::string reply = kvStore.GetKey(user); // The actual RPC call!
-    std::cout << "Get received: " << reply << std::endl;
-    reply = kvStore.PutKey(user); // The actual RPC call!
-    std::cout << "Put received: " << reply << std::endl;
-    reply = kvStore.DeleteKey(user); // The actual RPC call!
-    std::cout << "Delete received: " << reply << std::endl;
+
+    std::thread thread_ = std::thread(&KVStoreClient::AsyncCompleteRpc, &kvStore);
+
+    for (int i = 0; i < 100; i++)
+    {
+        std::string key(" Client_request: " + std::to_string(i));
+        kvStore.GetKey(key); // The actual RPC call!
+        kvStore.PutKey(key, key); // The actual RPC call!
+        kvStore.DeleteKey(key); // The actual RPC call!
+        
+    }
+    
+    std::cout << "Press control-c to quit" << std::endl
+              << std::endl;
+    thread_.join(); // blocks forever
 
     return 0;
 }

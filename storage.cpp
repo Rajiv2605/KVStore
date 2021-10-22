@@ -5,35 +5,35 @@
 
 void Storage::reader_lock()
 {
-    m.lock();
-    if(writers)
-        cv.wait(&m);
+    unique_lock<mutex> lock(m);
+    cv.wait(lock, [&]{ return !writers; });
     readers++;
-    m.unlock();
+    lock.unlock();
 }
 
 void Storage::reader_unlock()
 {
-    m.lock();
+    unique_lock<mutex> lock(m);
     readers--;
-    if(readers==0)
+    if(readers <= 0)
         cv.notify_all();
-    m.unlock();
+    lock.unlock();
 }
 
 void Storage::writer_lock()
 {
-    m.lock();
-    while(writers || (readers > 0))
-    m.unlock();
+    unique_lock<mutex> lock(m);
+    cv.wait(lock, [&]{ return !writers && (readers <= 0); } );
+    writers = true;
+    lock.unlock();
 }
 
 void Storage::writer_unlock()
 {
-    m.lock();
+    unique_lock<mutex> lock(m);
     writers = false;
     cv.notify_all();
-    m.unlock();
+    lock.unlock();
 }
 
 string Storage::handle_get(string key)

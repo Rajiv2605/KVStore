@@ -82,10 +82,18 @@ private:
                 new GetKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
-                // string prefix("Method: GET, Server_thread: ");
-                // cout<<request_.key()<<endl;
-                storage_->handle_get("50");
-                reply_.set_key("SUCCESS");
+
+                string result = storage_->handle_get(request_.key());
+                if (!result.compare("ERROR"))
+                {
+                    reply_.set_message("KEY DOES NOT EXISTS");
+                    reply_.set_status(400);
+                }
+                else
+                {
+                    reply_.set_status(200);
+                    reply_.set_value(result);
+                }
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -142,10 +150,8 @@ private:
                 new PutKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
-                // cout<<request_.key()<<request_.value()<<endl;
-
-                storage_->handle_put("50", "1500");
-                reply_.set_key("SUCCESS");
+                storage_->handle_put(request_.key(), request_.value());
+                reply_.set_status(200);
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -201,9 +207,16 @@ private:
                 new DeleteKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
-                cout<< request_.key()<<endl;
-                storage_->handle_delete(request_.key());
-                reply_.set_key("SUCCESS");
+                string result = storage_->handle_delete(request_.key());
+                if (!result.compare("ERROR"))
+                {
+                    reply_.set_message("KEY DOES NOT EXISTS");
+                    reply_.set_status(400);
+                }
+                else
+                {
+                    reply_.set_status(200);
+                }
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);

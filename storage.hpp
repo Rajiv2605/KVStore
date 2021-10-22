@@ -90,9 +90,9 @@ class Storage
     // void respond();
 
     // declare methods to service the requests and respond
-    void handle_get(string key);
+    string handle_get(string key);
     void handle_put(string key, string value);
-    void handle_delete(string key);
+    string handle_delete(string key);
     
     //Cache 
     int check_hit(string key);

@@ -114,17 +114,27 @@ int main(int argc, char **argv)
 
     thread thread_ = thread(&KVStoreClient::AsyncCompleteRpc, &kvStore);
 
-    for (int i = 0; i < 100; i++)
+    int option;
+    cin >> option;
+    string temp;
+    getline(cin, temp);
+    if (option = 1)
     {
-        string key(" Client_request: " + to_string(i));
-        kvStore.GetKey(key); // The actual RPC call!
-        kvStore.PutKey(key, key); // The actual RPC call!
-        kvStore.DeleteKey(key); // The actual RPC call!
-        
+        while (true)
+        {
+            string inp;
+            getline(cin, inp);
+            string token = inp.substr(0, inp.find(" "));
+
+            cout << token;
+        }
     }
-    
+    kvStore.PutKey("50", "500");
+    kvStore.GetKey("50");
+    kvStore.GetKey("50");
+
     cout << "Press control-c to quit" << endl
-              << endl;
+         << endl;
     thread_.join(); // blocks forever
 
     return 0;

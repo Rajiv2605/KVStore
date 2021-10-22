@@ -82,8 +82,10 @@ private:
                 new GetKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
-                string prefix("Method: GET, Server_thread: ");
-                reply_.set_key(prefix + to_string(thread_id) + request_.key());
+                // string prefix("Method: GET, Server_thread: ");
+                // cout<<request_.key()<<endl;
+                storage_->handle_get("50");
+                reply_.set_key("SUCCESS");
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -140,9 +142,10 @@ private:
                 new PutKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
-                string prefix("Method: PUT, Server_thread: ");
-                storage_->handle_put("5", "500");
-                reply_.set_key(prefix + to_string(thread_id) + request_.key());
+                // cout<<request_.key()<<request_.value()<<endl;
+
+                storage_->handle_put("50", "1500");
+                reply_.set_key("SUCCESS");
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -198,8 +201,9 @@ private:
                 new DeleteKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
-                string prefix("Method: DELETE, Server_thread: ");
-                reply_.set_key(prefix + to_string(thread_id) + request_.key());
+                cout<< request_.key()<<endl;
+                storage_->handle_delete(request_.key());
+                reply_.set_key("SUCCESS");
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);

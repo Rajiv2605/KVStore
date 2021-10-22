@@ -18,6 +18,7 @@ class Storage
     vector<map<int, int>> linesizes;    // stores line size for keys
     vector<set<int>> keys;              // stores keys
     bool isEmpty[10];
+    ifstream f_config;
 
     // cache block structure
     struct cache_block{
@@ -34,14 +35,21 @@ class Storage
     mutex m;
     condition_variable cv;
 
-    int lru =0,lfu=1;
-    int cache_set=4;    //cache_size/key_value_size;
+    string policy;
+    int cache_set;    //cache_size/key_value_size;
     struct cache_block LLC[/*cache_set*/ 64];
 
     Storage()
     {
         // init
         f_db = vector<fstream>(10);
+        f_config.open("config.txt");
+        string line;
+        getline(f_config, line);
+        getline(f_config, policy);
+        getline(f_config, line);
+        stringstream ss(line);
+        ss>>cache_set;
         for(int i=0; i<10; i++)
         {
             string name = "keydb" + to_string(i) + ".txt";

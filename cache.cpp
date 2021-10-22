@@ -70,14 +70,14 @@ void Storage::fill_cache(string key,string value)
 	}
 	else
 	{
-		if(lru == 1)
+		if(policy == "lru")
 		{
 			index = llc_lru_find_victim();
 			///LLC[index].valid=1;
 			LLC[index].lru=(cache_set-1);
 			llc_lru_update(index);
 		}
-		else if(lfu == 1)
+		else if(policy == "lfu")
 		{
 			index = llc_lfu_find_victim();
 			LLC[index].lfu=0;

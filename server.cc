@@ -8,7 +8,7 @@
 #include "keyvalue.grpc.pb.h"
 #include "storage.hpp"
 
-#define THREADPOOL_SIZE 4
+int THREADPOOL_SIZE = 4;
 
 using grpc::Server;
 using grpc::ServerAsyncResponseWriter;
@@ -33,7 +33,18 @@ public:
     }
     void Run()
     {
-        string server_address("0.0.0.0:50051");
+        ifstream f_config;
+        f_config.open("config.txt");
+        string portno;
+        getline(f_config, portno);
+        string server_address("0.0.0.0:"+portno);
+
+        string line;
+        getline(f_config, line);
+        getline(f_config, line);
+        getline(f_config, line);
+        stringstream ss(line);
+        ss>>THREADPOOL_SIZE;
 
         ServerBuilder builder;
         builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());

@@ -3,6 +3,39 @@
 #include <sstream>
 #include <string>
 
+void Storage::reader_lock()
+{
+    m.lock();
+    if(writers)
+        cv.wait(&m);
+    readers++;
+    m.unlock();
+}
+
+void Storage::reader_unlock()
+{
+    m.lock();
+    readers--;
+    if(readers==0)
+        cv.notify_all();
+    m.unlock();
+}
+
+void Storage::writer_lock()
+{
+    m.lock();
+    while(writers || (readers > 0))
+    m.unlock();
+}
+
+void Storage::writer_unlock()
+{
+    m.lock();
+    writers = false;
+    cv.notify_all();
+    m.unlock();
+}
+
 void Storage::handle_get(string key)
 {
     int idx = check_hit(key);

@@ -1,6 +1,6 @@
 // read the config file
 // setup the clients and server accordingly
-#include "server.hpp"
+#include "storage.hpp"
 #include <iostream>
 
 int main()
@@ -10,7 +10,7 @@ int main()
     // sample received string
     string s, key, method;
 
-    Server sr;
+    Storage sr;
     sr.handle_put("5", "500");
     sr.handle_put("4", "400");
     sr.handle_put("3", "300");

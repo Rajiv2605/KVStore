@@ -1,9 +1,9 @@
-#include "server.hpp"
+#include "storage.hpp"
 #include <iostream>
 #include <sstream>
 #include <string>
 
-void Server::handle_get(string key)
+void Storage::handle_get(string key)
 {
     int idx = check_hit(key);
     if(idx != -1)
@@ -39,7 +39,7 @@ void Server::handle_get(string key)
     fill_cache(k, v);
 }
 
-void Server::handle_put(string key, string value)
+void Storage::handle_put(string key, string value)
 {
     int idx = check_hit(key);
     for(int i=0; i<cache_set; i++)
@@ -153,7 +153,7 @@ void Server::handle_put(string key, string value)
     f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
 }
 
-void Server::handle_delete(string key)
+void Storage::handle_delete(string key)
 {
     int idx = check_hit(key);
     if(idx > -1)
@@ -219,7 +219,7 @@ void Server::handle_delete(string key)
 //     // sample received string
 //     string s, key, method;
 
-//     Server sr;
+//     Storage sr;
 //     sr.handle_put("5", "500");
 //     sr.handle_put("4", "400");
 //     sr.handle_put("3", "300");

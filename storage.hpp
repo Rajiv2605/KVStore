@@ -6,7 +6,7 @@
 
 using namespace std;
 
-class Server
+class Storage
 {
   public: // later move variables to private (public for ease of testing)
     vector<bool> bitmap;    // keeps track of empty lines to handle the PUT request
@@ -30,7 +30,7 @@ class Server
     int cache_set=4;    //cache_size/key_value_size;
     struct cache_block LLC[/*cache_set*/ 64];
 
-    Server()
+    Storage()
     {
         // init
         f_db = vector<fstream>(10);
@@ -55,7 +55,7 @@ class Server
         memset(isEmpty, true, sizeof(isEmpty));
     }
 
-    ~Server()
+    ~Storage()
     {
         for(int i=0; i<10; i++)
             f_db[i].close();

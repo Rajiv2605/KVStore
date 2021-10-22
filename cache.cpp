@@ -2,11 +2,11 @@
 #include <string.h>
 #include <iostream> 
 #include <bits/stdc++.h>
-#include "server.hpp"
+#include "storage.hpp"
 
 using namespace std; 
 
-int Server::check_hit(string key)
+int Storage::check_hit(string key)
 {
 	for(int i=0;i<cache_set;i++)
 	{
@@ -16,7 +16,7 @@ int Server::check_hit(string key)
 	}
 	return -1;
 }
-int Server::llc_lru_find_victim()
+int Storage::llc_lru_find_victim()
 {
 	for(int i=0;i<cache_set;i++)
 		if(LLC[i].valid == 0)
@@ -30,7 +30,7 @@ int Server::llc_lru_find_victim()
 	assert(0);
 }
 
-int Server::llc_lfu_find_victim()
+int Storage::llc_lfu_find_victim()
 {
 	int min= 9999999,index;
 	for(int i=0;i<cache_set;i++)
@@ -48,7 +48,7 @@ int Server::llc_lfu_find_victim()
 	
 }
 
-void Server::llc_lru_update(int index)
+void Storage::llc_lru_update(int index)
 {
 	for(int i=0;i<cache_set;i++)
 		if(LLC[i].lru < LLC[index].lru && LLC[i].valid == 1)
@@ -56,12 +56,12 @@ void Server::llc_lru_update(int index)
 	LLC[index].lru=0;
 }
 
-void Server::llc_lfu_update(int index)
+void Storage::llc_lfu_update(int index)
 {
 	LLC[index].lfu++;
 }
 
-void Server::fill_cache(string key,string value)
+void Storage::fill_cache(string key,string value)
 {
 	int index;
 	if(check_hit(key) > -1)
@@ -89,7 +89,7 @@ void Server::fill_cache(string key,string value)
 		LLC[index].value=value;
 	}	
 }
-void Server::print_cache()
+void Storage::print_cache()
 {
 	for(int i=0;i<cache_set;i++)
 		if(LLC[i].valid == 1)

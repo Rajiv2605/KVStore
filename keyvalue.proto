@@ -13,15 +13,18 @@ service KVStore {
 
 message KeyRequest {
   string key = 1;
+  int64 timestamp = 2;
 }
 
 message KeyValueRequest {
   string key = 1;
   string value = 2;
+  int64 timestamp = 3;
 }
 
 message KeyValueReply {
   string key = 1;
   string value = 2;
-  string error = 3;
+  string message = 3;
+  int32 status = 4;
 }

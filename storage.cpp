@@ -3,7 +3,7 @@
 #include <sstream>
 #include <string>
 
-void Storage::handle_get(string key)
+string Storage::handle_get(string key)
 {
     int idx = check_hit(key);
     if(idx != -1)
@@ -11,7 +11,7 @@ void Storage::handle_get(string key)
         string value = LLC[idx].value;
         // respond here
         cout<<"Cache hit: "<<value<<endl;
-        return;
+        return value;
     }
 
     // binary search on keys
@@ -23,7 +23,7 @@ void Storage::handle_get(string key)
     if(pos==keys[kidx].end())
     {
         cout<<"KEY NOT FOUND!"<<endl;
-        return;
+        return "ERROR";
     }
 
     int offs = table[kidx][K];
@@ -37,6 +37,7 @@ void Storage::handle_get(string key)
     cout<<"value: "<<v<<endl;
     // respond here
     fill_cache(k, v);
+    return v;
 }
 
 void Storage::handle_put(string key, string value)
@@ -153,7 +154,7 @@ void Storage::handle_put(string key, string value)
     f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
 }
 
-void Storage::handle_delete(string key)
+string Storage::handle_delete(string key)
 {
     int idx = check_hit(key);
     if(idx > -1)
@@ -173,7 +174,7 @@ void Storage::handle_delete(string key)
     if(!found)
     {
         cout<<"KEY NOT FOUND!"<<endl;
-        return;
+        return "ERROR";
     }
 
     // remove entries
@@ -210,6 +211,7 @@ void Storage::handle_delete(string key)
     remove(dbfname.c_str());
     rename("temp.txt", dbfname.c_str());
     f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
+    return "SUCCESS";
 }
 
 // int main()

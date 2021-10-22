@@ -49,6 +49,7 @@ public:
     {
         KeyValueRequest request;
         request.set_key(key);
+        request.set_value(value);
 
         AsyncClientCall *call = new AsyncClientCall;
 
@@ -86,7 +87,12 @@ public:
             GPR_ASSERT(ok);
 
             if (call->status.ok())
-                cout << "Success: " << call->reply.key() << endl;
+            {
+                cout << "key: " << call->reply.key() << endl;
+                cout << "value: " << call->reply.value() << endl;
+                cout << "message: " << call->reply.message() << endl;
+                cout << "status: " << call->reply.status() << endl;
+            }
             else
                 cout << "RPC failed" << endl;
 
@@ -115,23 +121,40 @@ int main(int argc, char **argv)
     thread thread_ = thread(&KVStoreClient::AsyncCompleteRpc, &kvStore);
 
     int option;
+    cout << "Modes:\nInteractive Mode: press 1 \nBatch Mode: press 2" << endl;
     cin >> option;
-    string temp;
-    getline(cin, temp);
-    if (option = 1)
+
+    if (option == 1)
     {
         while (true)
         {
-            string inp;
-            getline(cin, inp);
-            string token = inp.substr(0, inp.find(" "));
-
-            cout << token;
+            cout << "Enter a valid command: ";
+            string type, key, value;
+            cin >> type;
+            if (!type.compare("GET"))
+            {
+                cin >> key;
+                kvStore.GetKey(key);
+            }
+            else if (!type.compare("PUT"))
+            {
+                cin >> key;
+                cin >> value;
+                kvStore.PutKey(key, value);
+            }
+            else if (!type.compare("DELETE"))
+            {
+                cin >> key;
+                kvStore.DeleteKey(key);
+            }
+            else
+            {
+                cout << "Invalid input";
+                break;
+            }
+            sleep(1);
         }
     }
-    kvStore.PutKey("50", "500");
-    kvStore.GetKey("50");
-    kvStore.GetKey("50");
 
     cout << "Press control-c to quit" << endl
          << endl;

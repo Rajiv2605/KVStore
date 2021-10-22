@@ -1,8 +1,10 @@
 #include <set>
 #include <map>
+#include <mutex>
 #include <vector>
 #include <fstream>
 #include <cstring>
+#include <condition_variable>
 
 using namespace std;
 
@@ -25,6 +27,12 @@ class Storage
 	int lru;
 	int lfu;
 	};
+
+    // lock related
+    int readers = 0;
+    int writers = false;
+    mutex m;
+    condition_variable cv;
 
     int lru =0,lfu=1;
     int cache_set=4;    //cache_size/key_value_size;
@@ -71,11 +79,11 @@ class Storage
     // deleting from DB
     // void write_del(string key, int index);
 
-    // Readers-Writer lock for logfile handling
-    // void db_lock();
-    // void db_unlock();
-    // void log_lock();
-    // void log_unlock();
+    // Readers-Writer lock
+    void reader_lock();
+    void reader_unlock();
+    void writer_lock();
+    void writer_unlock();
 
     // declare methods to handle clients
     // void receive();

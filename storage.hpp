@@ -4,30 +4,32 @@
 #include <vector>
 #include <fstream>
 #include <cstring>
+#include <sstream>
 #include <condition_variable>
-
+#include <iostream>
 using namespace std;
 
 class Storage
 {
-  public: // later move variables to private (public for ease of testing)
-    vector<bool> bitmap;    // keeps track of empty lines to handle the PUT request
-    vector<fstream> f_db;           // handles the key-value db in persistent storage
+public:                   // later move variables to private (public for ease of testing)
+    vector<bool> bitmap;  // keeps track of empty lines to handle the PUT request
+    vector<fstream> f_db; // handles the key-value db in persistent storage
     // fstream f_log;          // handles the log file
-    vector<map<int, uint64_t>> table;   // stores offset for keys
-    vector<map<int, int>> linesizes;    // stores line size for keys
-    vector<set<int>> keys;              // stores keys
+    vector<map<int, uint64_t>> table; // stores offset for keys
+    vector<map<int, int>> linesizes;  // stores line size for keys
+    vector<set<int>> keys;            // stores keys
     bool isEmpty[10];
     ifstream f_config;
 
     // cache block structure
-    struct cache_block{
-	string key;
-	string value;
-	int valid;
-	int lru;
-	int lfu;
-	};
+    struct cache_block
+    {
+        string key;
+        string value;
+        int valid;
+        int lru;
+        int lfu;
+    };
 
     // lock related
     int readers = 0;
@@ -36,7 +38,7 @@ class Storage
     condition_variable cv;
 
     string policy;
-    int cache_set;    //cache_size/key_value_size;
+    int cache_set; //cache_size/key_value_size;
     struct cache_block LLC[/*cache_set*/ 64];
 
     Storage()
@@ -49,20 +51,23 @@ class Storage
         getline(f_config, policy);
         getline(f_config, line);
         stringstream ss(line);
-        ss>>cache_set;
-        for(int i=0; i<10; i++)
+
+        ss >> cache_set;
+        cout << "cache_set " << cache_set << endl;
+        cout << "policy " << policy << endl;
+        for (int i = 0; i < 10; i++)
         {
             string name = "keydb" + to_string(i) + ".txt";
             f_db[i].open(name, ios::out | ios::app | ios::in);
         }
         // f_log.open("log.txt", ios::out | ios::app | ios::in);
 
-    	for(int i=0;i<cache_set;i++)
+        for (int i = 0; i < cache_set; i++)
         {
-            LLC[i].key='\0';
-            LLC[i].value='\0';
-            LLC[i].lru=-1;
-            LLC[i].lfu=0;
+            LLC[i].key = '\0';
+            LLC[i].value = '\0';
+            LLC[i].lru = -1;
+            LLC[i].lfu = 0;
         }
 
         table = vector<map<int, uint64_t>>(10);
@@ -73,9 +78,9 @@ class Storage
 
     ~Storage()
     {
-        for(int i=0; i<10; i++)
+        for (int i = 0; i < 10; i++)
             f_db[i].close();
-    //   f_log.close();
+        //   f_log.close();
     }
 
     // commit logs for the given key
@@ -83,7 +88,7 @@ class Storage
 
     // appending to db
     // void write_put(string key, string value, int index);
-    
+
     // deleting from DB
     // void write_del(string key, int index);
 
@@ -101,13 +106,13 @@ class Storage
     string handle_get(string key);
     void handle_put(string key, string value);
     string handle_delete(string key);
-    
-    //Cache 
+
+    //Cache
     int check_hit(string key);
     int llc_lru_find_victim();
     int llc_lfu_find_victim();
     void llc_lru_update(int index);
     void llc_lfu_update(int index);
-    void fill_cache(string key,string value);
+    void fill_cache(string key, string value);
     void print_cache();
 };

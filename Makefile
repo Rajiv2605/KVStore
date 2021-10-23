@@ -1,5 +1,3 @@
-export GRPC_TRACE=api
-export GRPC_VERBOSITY=INFO
 HOST_SYSTEM = $(shell uname | cut -f 1 -d_)
 SYSTEM ?= $(HOST_SYSTEM)
 CXX = g++
@@ -30,6 +28,8 @@ client: keyvalue.pb.o keyvalue.grpc.pb.o client.o
 
 server: keyvalue.pb.o keyvalue.grpc.pb.o server.o storage.o cache.o
 	$(CXX) $^ $(LDFLAGS) -o $@
+	export GRPC_TRACE=api
+	export GRPC_VERBOSITY=INFO
 
 %.grpc.pb.cc: %.proto
 	$(PROTOC) -I $(PROTOS_PATH) --grpc_out=. --plugin=protoc-gen-grpc=$(GRPC_CPP_PLUGIN_PATH) $<

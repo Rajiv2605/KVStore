@@ -4,6 +4,7 @@
 #include <thread>
 #include <stdio.h>
 #include <fcntl.h>
+#include <sstream>
 #include "unistd.h"
 
 #include <grpc/support/log.h>
@@ -40,15 +41,17 @@ public:
         f_config.open("config.txt");
         string portno;
         getline(f_config, portno);
-        string server_address("0.0.0.0:"+portno);
+        string server_address("0.0.0.0:" + portno);
 
         string line;
         getline(f_config, line);
         getline(f_config, line);
         getline(f_config, line);
         stringstream ss(line);
-        ss>>THREADPOOL_SIZE;
-
+        ss >> THREADPOOL_SIZE;
+        cout << "THREADPOOL_SIZE " << THREADPOOL_SIZE << endl;
+        cout << "port no. " << portno << endl;
+        
         ServerBuilder builder;
         builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
         builder.RegisterService(&service_);
@@ -295,7 +298,7 @@ private:
         }
     }
 
-    unique_ptr<ServerCompletionQueue> cq_[THREADPOOL_SIZE];
+    unique_ptr<ServerCompletionQueue> cq_[4];
     KVStore::AsyncService service_;
     unique_ptr<Server> server_;
     Storage storage_;

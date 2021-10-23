@@ -6,6 +6,7 @@
 #include <sstream>
 #include <unordered_map>
 #include <time.h>
+#include <unistd.h>
 
 #include <grpc/support/log.h>
 #include <grpcpp/grpcpp.h>
@@ -97,7 +98,7 @@ public:
 
             if (call->status.ok())
             {
-                cout << "key: " << call->reply.key() << endl;
+                cout << "\nkey: " << call->reply.key() << endl;
                 cout << "value: " << call->reply.value() << endl;
                 cout << "message: " << call->reply.message() << endl;
                 cout << "status: " << call->reply.status() << endl;
@@ -151,7 +152,7 @@ int main(int argc, char **argv)
 
     int option;
 
-    cout << "Modes:\nInteractive Mode: press 1 \nBatch Mode: press 2" << endl;
+    cout << "Interactive Mode - press 1 \nBatch Mode - press 2\nEnter valid option:";
     cin >> option;
 
     if (option == 1)
@@ -224,10 +225,10 @@ int main(int argc, char **argv)
     {
 
         vector<thread> worker_threads;
-        for (int i = 0; i < 1; ++i)
+        for (int i = 0; i < 10; ++i)
             worker_threads.push_back(thread(testPut, &kvStore, i));
 
-        for (int i = 0; i < 1; ++i)
+        for (int i = 0; i < 10; ++i)
             worker_threads.push_back(thread(testGet, &kvStore, i));
 
         for (auto i{0}; i < worker_threads.size(); i++)

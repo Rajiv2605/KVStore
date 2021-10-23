@@ -1,2 +1,2 @@
-rm keydb.txt
+rm keydb*
 rm log.txt

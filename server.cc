@@ -2,6 +2,9 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <stdio.h>
+#include <fcntl.h>
+#include "unistd.h"
 
 #include <grpc/support/log.h>
 #include <grpcpp/grpcpp.h>
@@ -93,8 +96,9 @@ private:
                 new GetKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
-
+                storage_->reader_lock();
                 string result = storage_->handle_get(request_.key());
+                storage_->reader_unlock();
                 if (!result.compare("ERROR"))
                 {
                     reply_.set_message("KEY DOES NOT EXISTS");
@@ -104,7 +108,9 @@ private:
                 {
                     reply_.set_status(200);
                     reply_.set_value(result);
+                    reply_.set_key(request_.key());
                 }
+                reply_.set_timestamp(request_.timestamp());
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -161,8 +167,14 @@ private:
                 new PutKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
+                storage_->writer_lock();
                 storage_->handle_put(request_.key(), request_.value());
+                storage_->writer_unlock();
                 reply_.set_status(200);
+                reply_.set_key(request_.key());
+                reply_.set_value(request_.value());
+
+                reply_.set_timestamp(request_.timestamp());
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -218,7 +230,9 @@ private:
                 new DeleteKeyFunc(service_, storage_, cq_, thread_id);
 
                 // The actual processing.
+                storage_->writer_lock();
                 string result = storage_->handle_delete(request_.key());
+                storage_->writer_unlock();
                 if (!result.compare("ERROR"))
                 {
                     reply_.set_message("KEY DOES NOT EXISTS");
@@ -227,7 +241,10 @@ private:
                 else
                 {
                     reply_.set_status(200);
+                    reply_.set_key(request_.key());
                 }
+
+                reply_.set_timestamp(request_.timestamp());
 
                 status_ = FINISH;
                 responder_.Finish(reply_, Status::OK, this);
@@ -287,6 +304,8 @@ private:
 int main(int argc, char **argv)
 {
     ServerImpl server;
+    int file = open("log.txt", O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    dup2(file, fileno(stderr));
     server.Run();
 
     return 0;

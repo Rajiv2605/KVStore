@@ -1,3 +1,5 @@
+export GRPC_TRACE=api
+export GRPC_VERBOSITY=INFO
 HOST_SYSTEM = $(shell uname | cut -f 1 -d_)
 SYSTEM ?= $(HOST_SYSTEM)
 CXX = g++

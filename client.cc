@@ -2,6 +2,10 @@
 #include <memory>
 #include <string>
 #include <thread>
+#include <fstream>
+#include <sstream>
+#include <unordered_map>
+#include <time.h>
 
 #include <grpc/support/log.h>
 #include <grpcpp/grpcpp.h>
@@ -24,6 +28,8 @@ using keyvalue::KVStore;
 
 using namespace std;
 
+double total_time;
+
 class KVStoreClient
 {
 public:
@@ -34,6 +40,7 @@ public:
     {
         KeyRequest request;
         request.set_key(key);
+        request.set_timestamp(clock());
 
         AsyncClientCall *call = new AsyncClientCall;
 
@@ -50,6 +57,7 @@ public:
         KeyValueRequest request;
         request.set_key(key);
         request.set_value(value);
+        request.set_timestamp(clock());
 
         AsyncClientCall *call = new AsyncClientCall;
 
@@ -65,6 +73,7 @@ public:
     {
         KeyRequest request;
         request.set_key(key);
+        request.set_timestamp(clock());
 
         AsyncClientCall *call = new AsyncClientCall;
 
@@ -92,6 +101,13 @@ public:
                 cout << "value: " << call->reply.value() << endl;
                 cout << "message: " << call->reply.message() << endl;
                 cout << "status: " << call->reply.status() << endl;
+     
+                double start = call->reply.timestamp();
+                double end = clock() - start;
+                double time_taken = ((double)end) / CLOCKS_PER_SEC;
+
+                total_time += time_taken;
+                cout << total_time;
             }
             else
                 cout << "RPC failed" << endl;
@@ -113,6 +129,20 @@ private:
     CompletionQueue cq_;
 };
 
+void testPut(KVStoreClient *kvStore, int i)
+{
+    for (int j = 0; j < 10; j++)
+    {
+        kvStore->PutKey(to_string(((i + 1) * 10) + j), to_string(((i + 1) * 10) + j + 1));
+    }
+}
+
+void testGet(KVStoreClient *kvStore, int i)
+{
+    for (int j = 0; j < 10; j++)
+        kvStore->GetKey(to_string(((i + 1) * 10) + j));
+}
+
 int main(int argc, char **argv)
 {
     KVStoreClient kvStore(grpc::CreateChannel(
@@ -121,6 +151,7 @@ int main(int argc, char **argv)
     thread thread_ = thread(&KVStoreClient::AsyncCompleteRpc, &kvStore);
 
     int option;
+
     cout << "Modes:\nInteractive Mode: press 1 \nBatch Mode: press 2" << endl;
     cin >> option;
 
@@ -155,10 +186,57 @@ int main(int argc, char **argv)
             sleep(1);
         }
     }
+    else if (option == 2)
+    {
+        ifstream commands;
+        commands.open("commands.txt");
+        while (commands)
+        {
+            string line;
+            getline(commands, line);
+            stringstream ss(line);
+            string type, key, value;
+            ss >> type;
+            if (!type.compare("GET"))
+            {
+                ss >> key;
+                kvStore.GetKey(key);
+            }
+            else if (!type.compare("PUT"))
+            {
+                ss >> key;
+                ss >> value;
+                kvStore.PutKey(key, value);
+            }
+            else if (!type.compare("DELETE"))
+            {
+                ss >> key;
+                kvStore.DeleteKey(key);
+            }
+            else
+            {
+                cout << "Press control-c to quit" << endl;
+                break;
+            }
+        }
+    }
 
-    cout << "Press control-c to quit" << endl
-         << endl;
+    else if (option == 3)
+    {
+
+        vector<thread> worker_threads;
+        for (int i = 0; i < 10; ++i)
+            worker_threads.push_back(thread(testPut, &kvStore, i));
+
+        for (int i = 0; i < 10; ++i)
+            worker_threads.push_back(thread(testGet, &kvStore, i));
+
+        for (auto i{0}; i < worker_threads.size(); i++)
+            worker_threads[i].join();
+    }
+
     thread_.join(); // blocks forever
+    cout << total_time;
 
     return 0;
 }

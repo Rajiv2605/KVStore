@@ -97,7 +97,6 @@ public:
 
             if (call->status.ok())
             {
-                call->reply.
                 cout << "key: " << call->reply.key() << endl;
                 cout << "value: " << call->reply.value() << endl;
                 cout << "message: " << call->reply.message() << endl;
@@ -132,15 +131,14 @@ private:
 
 void testPut(KVStoreClient *kvStore, int i)
 {
-    for (int j = 0; j < 10; j++)
-    {
+    for (int j = 0; j < 5; j++)
         kvStore->PutKey(to_string(((i + 1) * 10) + j), to_string(((i + 1) * 10) + j + 1));
-    }
+    
 }
 
 void testGet(KVStoreClient *kvStore, int i)
 {
-    for (int j = 0; j < 10; j++)
+    for (int j = 0; j < 5; j++)
         kvStore->GetKey(to_string(((i + 1) * 10) + j));
 }
 
@@ -226,10 +224,10 @@ int main(int argc, char **argv)
     {
 
         vector<thread> worker_threads;
-        for (int i = 0; i < 10; ++i)
+        for (int i = 0; i < 1; ++i)
             worker_threads.push_back(thread(testPut, &kvStore, i));
 
-        for (int i = 0; i < 10; ++i)
+        for (int i = 0; i < 1; ++i)
             worker_threads.push_back(thread(testGet, &kvStore, i));
 
         for (auto i{0}; i < worker_threads.size(); i++)

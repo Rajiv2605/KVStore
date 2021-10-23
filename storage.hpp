@@ -70,9 +70,9 @@ public:                   // later move variables to private (public for ease of
             LLC[i].lfu = 0;
         }
 
-        table = vector<map<int, uint64_t>>(10);
-        linesizes = vector<map<int, int>>(10);
-        keys = vector<set<int>>(10);
+        table = vector<map<string, uint64_t>>(10);
+        linesizes = vector<map<string, int>>(10);
+        keys = vector<set<string>>(10);
         memset(isEmpty, true, sizeof(isEmpty));
     }
 

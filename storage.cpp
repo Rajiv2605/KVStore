@@ -267,8 +267,8 @@ string Storage::handle_delete(string key)
 //     // sr.handle_get("5");
 //     // sr.handle_delete("13");
 
-//     for(auto i=sr.table.begin(); i!=sr.table.end(); i++)
-//         cout<<i->first<<" "<<i->second<<endl;
+//     // for(auto i=sr.table.begin(); i!=sr.table.end(); i++)
+//     //     cout<<i->first<<" "<<i->second<<endl;
 
 //     return 0;
 // }

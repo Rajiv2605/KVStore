@@ -51,6 +51,8 @@ public:
         ss >> THREADPOOL_SIZE;
         cout << "THREADPOOL_SIZE " << THREADPOOL_SIZE << endl;
         cout << "port no. " << portno << endl;
+
+        cq_ = new unique_ptr<ServerCompletionQueue>[THREADPOOL_SIZE];
         
         ServerBuilder builder;
         builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
@@ -298,7 +300,7 @@ private:
         }
     }
 
-    unique_ptr<ServerCompletionQueue> cq_[4];
+    unique_ptr<ServerCompletionQueue> *cq_;
     KVStore::AsyncService service_;
     unique_ptr<Server> server_;
     Storage storage_;

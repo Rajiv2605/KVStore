@@ -15,9 +15,9 @@ public:                   // later move variables to private (public for ease of
     vector<bool> bitmap;  // keeps track of empty lines to handle the PUT request
     vector<fstream> f_db; // handles the key-value db in persistent storage
     // fstream f_log;          // handles the log file
-    vector<map<int, uint64_t>> table; // stores offset for keys
-    vector<map<int, int>> linesizes;  // stores line size for keys
-    vector<set<int>> keys;            // stores keys
+    vector<map<string, uint64_t>> table; // stores offset for keys
+    vector<map<string, int>> linesizes;  // stores line size for keys
+    vector<set<string>> keys;            // stores keys
     bool isEmpty[10];
     ifstream f_config;
 

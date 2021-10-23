@@ -48,18 +48,16 @@ string Storage::handle_get(string key)
     }
 
     // binary search on keys
-    stringstream ss(key);
-    int K;
-    ss>>K;
-    int kidx = K%10;
-    auto pos = keys[kidx].find(K);
+    int kidx = key[key.size()-1];
+    kidx = kidx%10;
+    auto pos = keys[kidx].find(key);
     if(pos==keys[kidx].end())
     {
         cout<<"KEY NOT FOUND!"<<endl;
         return "ERROR";
     }
 
-    int offs = table[kidx][K];
+    int offs = table[kidx][key];
     f_db[kidx].seekp(offs, ios::beg);
     string line;
     getline(f_db[kidx], line);
@@ -88,10 +86,8 @@ void Storage::handle_put(string key, string value)
         LLC[idx].valid = 1;
     }
 
-    stringstream conv(key);
-    int K;
-    conv>>K;
-    int kidx = K%10;
+    int kidx = key[key.size()-1];
+    kidx = kidx%10;
     string line;
     f_db[kidx].seekg(0, ios::beg);
     bool written = false;
@@ -101,9 +97,9 @@ void Storage::handle_put(string key, string value)
     {
         f_db[kidx].seekg(0, ios::beg);
         f_db[kidx]<<newl<<endl;
-        table[kidx][K] = 0;
-        keys[kidx].insert(K);
-        linesizes[kidx][K] = newl.size();
+        table[kidx][key] = 0;
+        keys[kidx].insert(key);
+        linesizes[kidx][key] = newl.size();
         isEmpty[kidx] = false;
         return;
     }
@@ -114,7 +110,7 @@ void Storage::handle_put(string key, string value)
     // check if the key is already present in the DB
     bool isPresent = false;
     for(auto i=keys[kidx].begin(); i!=keys[kidx].end(); i++)
-        if(*i==K)
+        if(*i==key)
         {
             isPresent = true;
             break;
@@ -123,13 +119,13 @@ void Storage::handle_put(string key, string value)
     while(getline(f_db[kidx], line))
     {
         stringstream getVals(line);
-        int k;
+        string k;
         getVals>>k;
-        if(k < K)
+        if(k < key)
         {
             newdb<<line<<endl;
         }
-        else if(k > K)
+        else if(k > key)
         {
             if(!written)
             {
@@ -140,17 +136,17 @@ void Storage::handle_put(string key, string value)
                 if(!isPresent)
                 {   
                     // cout<<"Inserting new: "<<K<<endl;
-                    int maxkey=-1;
+                    string maxkey = "";
                     for(auto x = keys[kidx].begin(); x != keys[kidx].end(); x++)
                     {
-                        if(*x > K)
+                        if(*x > key)
                             break;
                         maxkey = *x;
                     }
-                    if(maxkey == -1)
-                        table[kidx][K] = 0;
+                    if(maxkey == "")
+                        table[kidx][key] = 0;
                     else
-                        table[kidx][K] = table[kidx][maxkey] + linesizes[kidx][maxkey] + 1;
+                        table[kidx][key] = table[kidx][maxkey] + linesizes[kidx][maxkey] + 1;
                 }
             }
 
@@ -167,18 +163,18 @@ void Storage::handle_put(string key, string value)
         // calculate offset for current line here
         if(!isPresent)
         {
-            int maxkey;
+            string maxkey;
             for(auto x = keys[kidx].begin(); x != keys[kidx].end(); x++)
             {
-                if(*x > K)
+                if(*x > key)
                     break;
                 maxkey = *x;
             }
-            table[kidx][K] = table[kidx][maxkey] + linesizes[kidx][maxkey] + 1;
+            table[kidx][key] = table[kidx][maxkey] + linesizes[kidx][maxkey] + 1;
         }
     }
-    keys[kidx].insert(K);
-    linesizes[kidx][K] = newl.size();
+    keys[kidx].insert(key);
+    linesizes[kidx][key] = newl.size();
     newdb.close();
     f_db[kidx].close();
     string dbfname = "keydb" + to_string(kidx) + ".txt";
@@ -194,12 +190,10 @@ string Storage::handle_delete(string key)
         LLC[idx].valid = 0;
 
     bool found = false;
-    stringstream ss(key);
-    int K;
-    ss>>K;
-    int kidx = K%10;
+    int kidx = key[key.size()-1];
+    kidx = kidx%10;
     for(auto i=keys[kidx].begin(); i!=keys[kidx].end(); i++)
-        if(*i==K)
+        if(*i==key)
         {
             found = true;
             break;
@@ -211,17 +205,17 @@ string Storage::handle_delete(string key)
     }
 
     // remove entries
-    table[kidx].erase(K);
-    int lsz = linesizes[kidx][K]+1;
-    linesizes[kidx].erase(K);
-    set<int>::iterator i;
+    table[kidx].erase(key);
+    int lsz = linesizes[kidx][key]+1;
+    linesizes[kidx].erase(key);
+    set<string>::iterator i;
     for(i=keys[kidx].begin(); i!=keys[kidx].end(); i++)
-        if(*i==K)
+        if(*i==key)
             break;
     keys[kidx].erase(i);
-    for(map<int, uint64_t>::iterator i=table[kidx].begin(); i!=table[kidx].end(); i++)
+    for(map<string, uint64_t>::iterator i=table[kidx].begin(); i!=table[kidx].end(); i++)
     {
-        if(i->first > K)
+        if(i->first > key)
             i->second -= lsz;
     }
 

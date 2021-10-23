@@ -97,6 +97,7 @@ public:
 
             if (call->status.ok())
             {
+                call->reply.
                 cout << "key: " << call->reply.key() << endl;
                 cout << "value: " << call->reply.value() << endl;
                 cout << "message: " << call->reply.message() << endl;
@@ -107,7 +108,7 @@ public:
                 double time_taken = ((double)end) / CLOCKS_PER_SEC;
 
                 total_time += time_taken;
-                cout << total_time;
+                cout <<"cumulative response time: " << total_time <<endl<< endl;
             }
             else
                 cout << "RPC failed" << endl;
@@ -236,7 +237,6 @@ int main(int argc, char **argv)
     }
 
     thread_.join(); // blocks forever
-    cout << total_time;
 
     return 0;
 }

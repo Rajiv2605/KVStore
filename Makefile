@@ -45,4 +45,4 @@ cache.o: cache.cpp storage.hpp
 	g++ -c cache.cpp
 
 clean:
-	rm -f *.o *.pb.cc *.pb.h client server storage
+	rm -f *.o *.pb.cc *.pb.h client server storage keydb* log.txt

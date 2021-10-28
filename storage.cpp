@@ -101,6 +101,7 @@ void Storage::handle_put(string key, string value)
         keys[kidx].insert(key);
         linesizes[kidx][key] = newl.size();
         isEmpty[kidx] = false;
+        cout<<"Key-value inserted"<<endl;
         return;
     }
 
@@ -181,6 +182,7 @@ void Storage::handle_put(string key, string value)
     remove(dbfname.c_str());
     rename("temp.txt", dbfname.c_str());
     f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
+    cout<<"Key-value inserted"<<endl;
 }
 
 string Storage::handle_delete(string key)
@@ -238,6 +240,7 @@ string Storage::handle_delete(string key)
     remove(dbfname.c_str());
     rename("temp.txt", dbfname.c_str());
     f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
+    cout<<"Key-value deleted"<<endl;
     return "SUCCESS";
 }
 

@@ -44,6 +44,7 @@ string Storage::handle_get(string key)
         string value = LLC[idx].value;
         // respond here
         cout<<"Cache hit: "<<value<<endl;
+        print_cache();
         return value;
     }
 
@@ -68,6 +69,7 @@ string Storage::handle_get(string key)
     cout<<"value: "<<v<<endl;
     // respond here
     fill_cache(k, v);
+    print_cache();
     return v;
 }
 

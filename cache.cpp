@@ -10,8 +10,13 @@ int Storage::check_hit(string key)
 {
 	for(int i=0;i<cache_set;i++)
 	{
-		if(LLC[i].key== key && LLC[i].valid==1)
+		if(LLC[i].key== key && LLC[i].valid==1){
+			if (!policy.compare("lru"))
+				llc_lru_update(i);
+			else if (!policy.compare("lfu"))
+				llc_lfu_update(i);
 			return i;
+		}
 			
 	}
 	return -1;
@@ -70,19 +75,19 @@ void Storage::fill_cache(string key,string value)
 	}
 	else
 	{
-		if(policy.compare("lru"))
+		if(!policy.compare("lru"))
 		{
 			index = llc_lru_find_victim();
-			///LLC[index].valid=1;
+			LLC[index].valid=1;
 			LLC[index].lru=(cache_set-1);
 			llc_lru_update(index);
 		}
-		else if(policy.compare("lfu"))
+		else if(!policy.compare("lfu"))
 		{
 			index = llc_lfu_find_victim();
+			LLC[index].valid=1;
 			LLC[index].lfu=0;
 			llc_lfu_update(index);
-			
 		}
 		LLC[index].valid=1;
 		LLC[index].key=key;
@@ -93,7 +98,7 @@ void Storage::print_cache()
 {
 	for(int i=0;i<cache_set;i++)
 		if(LLC[i].valid == 1)
-			cout<<" LLC[i].key : "<<LLC[i].key<<"LLC[i].value : "<<LLC[i].value<<" LLC[i].lru :  "<<LLC[i].lru<<" LLC[i].lfu : " <<LLC[i].lfu<<endl;
+			cout<<"Set : "<<i<<" key: "<<LLC[i].key<<" value : "<<LLC[i].value<<" lru : "<<LLC[i].lru<<" lfu : " <<LLC[i].lfu<<endl;
 } 
 /*int main()
 {

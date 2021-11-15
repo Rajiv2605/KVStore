@@ -96,6 +96,7 @@ void Storage::fill_cache(string key,string value)
 }
 void Storage::print_cache()
 {
+	cout<<"\nCache state:\n";
 	for(int i=0;i<cache_set;i++)
 		if(LLC[i].valid == 1)
 			cout<<"Set : "<<i<<" key: "<<LLC[i].key<<" value : "<<LLC[i].value<<" lru : "<<LLC[i].lru<<" lfu : " <<LLC[i].lfu<<endl;

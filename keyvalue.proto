@@ -11,6 +11,23 @@ service KVStore {
   rpc DeleteKey (KeyRequest) returns (KeyValueReply) {}
 }
 
+service ServerComm {
+  rpc Join (JoinRequest) returns (JoinReply) {}
+}
+
+message JoinRequest {
+  string ip = 1;
+  string port = 2;
+  int64 id = 3;
+}
+
+message JoinReply {
+  string ip = 1;
+  string port = 2;
+  string message = 3;
+  int64 id = 4;
+}
+
 message KeyRequest {
   string key = 1;
   int64 timestamp = 2;

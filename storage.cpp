@@ -43,7 +43,8 @@ string Storage::handle_get(string key)
     {
         string value = LLC[idx].value;
         // respond here
-        cout<<"Cache hit: "<<value<<endl;
+        cout<<"\nCache hit: "<<value<<endl;
+        print_cache();
         return value;
     }
 
@@ -53,7 +54,7 @@ string Storage::handle_get(string key)
     auto pos = keys[kidx].find(key);
     if(pos==keys[kidx].end())
     {
-        cout<<"KEY NOT FOUND!"<<endl;
+        cout<<"\nKEY NOT FOUND!"<<endl;
         return "ERROR";
     }
 
@@ -65,9 +66,10 @@ string Storage::handle_get(string key)
     string k, v;
     getVal>>k;
     getVal>>v;
-    cout<<"value: "<<v<<endl;
+    cout<<"\nCache miss: "<<v<<endl;
     // respond here
     fill_cache(k, v);
+    print_cache();
     return v;
 }
 
@@ -101,7 +103,7 @@ void Storage::handle_put(string key, string value)
         keys[kidx].insert(key);
         linesizes[kidx][key] = newl.size();
         isEmpty[kidx] = false;
-        cout<<"Key-value inserted"<<endl;
+        cout<<"\nInserted, key: "<< key <<", value: "<< value <<endl;
         return;
     }
 
@@ -182,7 +184,7 @@ void Storage::handle_put(string key, string value)
     remove(dbfname.c_str());
     rename("temp.txt", dbfname.c_str());
     f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
-    cout<<"Key-value inserted"<<endl;
+    cout<<"\nInserted, key: "<< key <<", value: "<< value <<endl;
 }
 
 string Storage::handle_delete(string key)
@@ -202,7 +204,7 @@ string Storage::handle_delete(string key)
         }
     if(!found)
     {
-        cout<<"KEY NOT FOUND!"<<endl;
+        cout<<"\nKEY NOT FOUND!"<<endl;
         return "ERROR";
     }
 
@@ -240,38 +242,6 @@ string Storage::handle_delete(string key)
     remove(dbfname.c_str());
     rename("temp.txt", dbfname.c_str());
     f_db[kidx].open(dbfname, ios::out | ios::app | ios::in);
-    cout<<"Key-value deleted"<<endl;
+    cout<<"\nDelete successful, key: "<< key <<endl;
     return "SUCCESS";
 }
-
-// int main()
-// {
-//     // WRITE PARSER
-    
-//     // sample received string
-//     string s, key, method;
-
-//     Storage sr;
-//     sr.handle_put("5", "500");
-//     sr.handle_put("4", "400");
-//     sr.handle_put("3", "300");
-//     sr.handle_put("2", "200");
-
-//     sr.handle_delete("3");
-//     // sr.handle_put("2", "100");
-//     // sr.handle_delete("2");
-//     // sr.handle_put("2", "200");
-
-//     // // sr.handle_delete("4");
-//     // sr.handle_get("1");
-//     // sr.handle_get("3");
-//     sr.handle_get("2");
-//     // sr.handle_get("4");
-//     // sr.handle_get("5");
-//     // sr.handle_delete("13");
-
-//     // for(auto i=sr.table.begin(); i!=sr.table.end(); i++)
-//     //     cout<<i->first<<" "<<i->second<<endl;
-
-//     return 0;
-// }

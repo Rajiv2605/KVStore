@@ -32,6 +32,7 @@ public:                   // later move variables to private (public for ease of
     };
 
     // lock related
+    string id;
     int readers = 0;
     int writers = false;
     mutex m;
@@ -55,11 +56,6 @@ public:                   // later move variables to private (public for ease of
         ss >> cache_set;
         cout << "# of cache sets: " << cache_set << endl;
         cout << "cache replacement policy: " << policy << endl;
-        for (int i = 0; i < 10; i++)
-        {
-            string name = "keydb" + to_string(i) + ".txt";
-            f_db[i].open(name, ios::out | ios::app | ios::in);
-        }
         // f_log.open("log.txt", ios::out | ios::app | ios::in);
 
         for (int i = 0; i < cache_set; i++)
@@ -81,6 +77,20 @@ public:                   // later move variables to private (public for ease of
         for (int i = 0; i < 10; i++)
             f_db[i].close();
         //   f_log.close();
+    }
+
+    void set_server_id(string sid)
+    {
+        id = sid;
+    }
+
+    void create_db()
+    {
+        for (int i = 0; i < 10; i++)
+        {
+            string name = "keydb" + id + "_" + to_string(i) + ".txt";
+            f_db[i].open(name, ios::out | ios::app | ios::in);
+        }
     }
 
     // commit logs for the given key

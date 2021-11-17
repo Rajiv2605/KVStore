@@ -82,6 +82,14 @@ class ServerReceiver final : public ServerComm::Service
 
 class ServerImpl final : public KVStore::Service
 {
+    public:
+    ServerImpl(string server_id)
+    {
+        storage_.set_server_id(server_id);
+        storage_.create_db();
+    }
+
+
     Status GetKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
     {
         storage_.reader_lock();
@@ -138,6 +146,7 @@ class ServerImpl final : public KVStore::Service
         return Status::OK;
     }
 
+    private:
     Storage storage_;
 };
 
@@ -163,6 +172,15 @@ void joinServer()
     }
 }
 
+// Reference: https://stackoverflow.com/questions/8029121/how-to-hash-stdstring
+string generate_hash(string server_address)
+{
+	hash<string> hasher;
+	size_t hash = hasher(server_address);
+	hash = hash%100;
+	return to_string(hash);
+}
+
 void RunServer(const string &port)
 {
 
@@ -180,7 +198,8 @@ void RunServer(const string &port)
     ss >> THREADPOOL_SIZE;
     cout << "Threadpool size: " << THREADPOOL_SIZE << endl;
     
-    ServerImpl keyService;
+    string server_hash = generate_hash(server_address);
+    ServerImpl keyService(server_hash);
     ServerReceiver serverCommService;
 
     grpc::EnableDefaultHealthCheckService(true);

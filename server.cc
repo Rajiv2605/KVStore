@@ -12,6 +12,7 @@
 #include <grpc/support/log.h>
 #include <grpcpp/grpcpp.h>
 #include "keyvalue.grpc.pb.h"
+#include "keyvalue.pb.h"
 #include "storage.hpp"
 
 #include "sha1.cpp"
@@ -19,6 +20,7 @@
 int THREADPOOL_SIZE = 4;
 string fhsh = "  ";
 string server_hash;
+map<string, string> id_port;
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -46,9 +48,8 @@ public:
     string Join(const string &ip, const string &port, const string &id)
     {
         JoinRequest request;
-        request.set_ip(ip);
-        request.set_port(port);
         request.set_id(id);
+        request.set_port(port);
 
         JoinReply reply;
 
@@ -58,7 +59,14 @@ public:
 
         if (status.ok())
         {
-            return reply.message();
+            int sz = reply.id_port_size();
+            cout<<"Size: "<<sz<<endl;
+            for(int i=0; i<sz; i++)
+            {
+                const keyvalue::IdPortMessage *msg = &reply.id_port(i);
+                cout<<msg->id()<<" "<<msg->port()<<endl;
+            }
+            return "Success!!\n";
         }
         else
         {
@@ -75,10 +83,25 @@ class ServerReceiver final : public ServerComm::Service
 {
     Status Join(ServerContext *context, const JoinRequest *request, JoinReply *reply) override
     {
-        cout<<"New connection from server, id: " << request->id() << endl;
+        for(map<string, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
+        {
+            keyvalue::IdPortMessage *idp = reply->add_id_port();
+            idp->set_id(i->first);
+            idp->set_port(i->second);
+        }
+        // int sz = request->id_port_size();
+        // cout<<"Size: "<<sz<<endl;
+        // for(int i=0; i<sz; i++)
+        // {
+        //     const keyvalue::IdPortMessage *msg = &request->id_port(i);
+        //     cout<<msg->id()<<" "<<msg->port()<<endl;
+        // }
+
+
+        // cout<<"New connection from server, id: " << request->id() << endl;
         cout.flush();
         
-        reply->set_message("Successfully joined");
+        // reply->set_message("Successfully joined");
         return Status::OK;
     }
 };
@@ -187,7 +210,6 @@ string generate_hash(string server_address)
 
 void RunServer(const string &port)
 {
-
     ifstream f_config;
     f_config.open("config.txt");
     string portno;
@@ -205,6 +227,10 @@ void RunServer(const string &port)
     server_hash = generate_hash(server_address);
     ServerImpl keyService(server_hash);
     ServerReceiver serverCommService;
+
+    // adding port number and id
+    id_port[server_hash] = port;
+    id_port["!234"] = "hi";
 
     grpc::EnableDefaultHealthCheckService(true);
     grpc::reflection::InitProtoReflectionServerBuilderPlugin();

@@ -15,17 +15,18 @@ service ServerComm {
   rpc Join (JoinRequest) returns (JoinReply) {}
 }
 
-message JoinRequest {
-  string ip = 1;
+message IdPortMessage {
+  string id = 1;
   string port = 2;
-  string id = 3;
+}
+
+message JoinRequest {
+  string id = 1;
+  string port = 2; 
 }
 
 message JoinReply {
-  string ip = 1;
-  string port = 2;
-  string message = 3;
-  int64 id = 4;
+  repeated IdPortMessage id_port = 1;
 }
 
 message KeyRequest {

@@ -7,6 +7,8 @@
 #include <sstream>
 #include "unistd.h"
 
+#include <grpcpp/ext/proto_server_reflection_plugin.h>
+#include <grpcpp/health_check_service_interface.h>
 #include <grpc/support/log.h>
 #include <grpcpp/grpcpp.h>
 #include "keyvalue.grpc.pb.h"
@@ -14,10 +16,11 @@
 
 int THREADPOOL_SIZE = 4;
 
+using grpc::Channel;
+using grpc::ClientContext;
+
 using grpc::Server;
-using grpc::ServerAsyncResponseWriter;
 using grpc::ServerBuilder;
-using grpc::ServerCompletionQueue;
 using grpc::ServerContext;
 using grpc::Status;
 using keyvalue::KeyRequest;
@@ -25,293 +28,188 @@ using keyvalue::KeyValueReply;
 using keyvalue::KeyValueRequest;
 using keyvalue::KVStore;
 
-class ServerImpl final
+using keyvalue::JoinReply;
+using keyvalue::JoinRequest;
+using keyvalue::ServerComm;
+
+
+class ServerSender
 {
 public:
-    ~ServerImpl()
+    ServerSender(std::shared_ptr<Channel> channel)
+        : stub_(ServerComm::NewStub(channel)) {}
+
+    string Join(const string &ip, const string &port, const int &id)
     {
-        delete &storage_;
-        server_->Shutdown();
-        for (int i = 0; i < THREADPOOL_SIZE; i++)
-            cq_[i]->Shutdown();
-    }
-    void Run()
-    {
-        ifstream f_config;
-        f_config.open("config.txt");
-        string portno;
-        getline(f_config, portno);
-        string server_address("0.0.0.0:" + portno);
+        JoinRequest request;
+        request.set_ip(ip);
+        request.set_port(port);
+        request.set_id(id);
 
-        string line;
-        getline(f_config, line);
-        getline(f_config, line);
-        getline(f_config, line);
-        stringstream ss(line);
-        ss >> THREADPOOL_SIZE;
-        cout << "THREADPOOL_SIZE " << THREADPOOL_SIZE << endl;
-        cout << "port no. " << portno << endl;
+        JoinReply reply;
 
-        cq_ = new unique_ptr<ServerCompletionQueue>[THREADPOOL_SIZE];
-        
-        ServerBuilder builder;
-        builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-        builder.RegisterService(&service_);
+        ClientContext context;
 
-        for (int i = 0; i < THREADPOOL_SIZE; i++)
-            cq_[i] = builder.AddCompletionQueue();
+        Status status = stub_->Join(&context, request, &reply);
 
-        server_ = builder.BuildAndStart();
-        cout << "Server listening on " << server_address << endl;
-
-        vector<thread> worker_threads;
-        for (int i = 0; i < THREADPOOL_SIZE; ++i)
-            worker_threads.push_back(thread(&ServerImpl::HandleRpcs, this, i));
-        for (auto i{0}; i < worker_threads.size(); i++)
-            worker_threads[i].join();
+        if (status.ok())
+        {
+            return reply.message();
+        }
+        else
+        {
+            cout << status.error_code() << ": " << status.error_message() << endl;
+            return "RPC failed";
+        }
     }
 
 private:
-    class CallData
+    std::unique_ptr<ServerComm::Stub> stub_;
+};
+
+class ServerReceiver final : public ServerComm::Service
+{
+    Status Join(ServerContext *context, const JoinRequest *request, JoinReply *reply) override
     {
-    public:
-        virtual void Proceed() = 0;
-    };
+        cout<<"New connection from server, id: " << request->id() << endl;
+        cout.flush();
+        
+        reply->set_message("Successfully joined");
+        return Status::OK;
+    }
+};
 
-    class GetKeyFunc final : public CallData
+
+class ServerImpl final : public KVStore::Service
+{
+    Status GetKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
     {
-    public:
-        GetKeyFunc(KVStore::AsyncService *service, Storage *storage, ServerCompletionQueue *cq, int thread_id_)
-            : service_(service), storage_(storage), cq_(cq), responder_(&ctx_), status_(CREATE), thread_id(thread_id_)
+        storage_.reader_lock();
+        string result = storage_.handle_get(request->key());
+        storage_.reader_unlock();
+        if (!result.compare("ERROR"))
         {
-            Proceed();
+            reply->set_message("KEY DOES NOT EXISTS");
+            reply->set_status(400);
         }
-
-        void Proceed()
+        else
         {
-            if (status_ == CREATE)
-            {
-                status_ = PROCESS;
-
-                service_->RequestGetKey(&ctx_, &request_, &responder_, cq_, cq_, this);
-            }
-            else if (status_ == PROCESS)
-            {
-                //new client
-                new GetKeyFunc(service_, storage_, cq_, thread_id);
-
-                // The actual processing.
-                storage_->reader_lock();
-                string result = storage_->handle_get(request_.key());
-                storage_->reader_unlock();
-                if (!result.compare("ERROR"))
-                {
-                    reply_.set_message("KEY DOES NOT EXISTS");
-                    reply_.set_status(400);
-                }
-                else
-                {
-                    reply_.set_status(200);
-                    reply_.set_value(result);
-                    reply_.set_key(request_.key());
-                }
-                reply_.set_timestamp(request_.timestamp());
-
-                status_ = FINISH;
-                responder_.Finish(reply_, Status::OK, this);
-            }
-            else
-            {
-                GPR_ASSERT(status_ == FINISH);
-                delete this;
-            }
+            reply->set_status(200);
+            reply->set_value(result);
+            reply->set_key(request->key());
         }
+        reply->set_timestamp(request->timestamp());
 
-    private:
-        KVStore::AsyncService *service_;
-        ServerCompletionQueue *cq_;
-        ServerContext ctx_;
-        Storage *storage_;
-
-        KeyRequest request_;
-        KeyValueReply reply_;
-
-        int thread_id;
-
-        ServerAsyncResponseWriter<KeyValueReply> responder_;
-
-        enum CallStatus
-        {
-            CREATE,
-            PROCESS,
-            FINISH
-        };
-        CallStatus status_;
-    };
-
-    class PutKeyFunc final : public CallData
-    {
-    public:
-        PutKeyFunc(KVStore::AsyncService *service, Storage *storage, ServerCompletionQueue *cq, int thread_id_)
-            : service_(service), storage_(storage), cq_(cq), responder_(&ctx_), status_(CREATE), thread_id(thread_id_)
-        {
-            Proceed();
-        }
-
-        void Proceed()
-        {
-            if (status_ == CREATE)
-            {
-                status_ = PROCESS;
-
-                service_->RequestPutKey(&ctx_, &request_, &responder_, cq_, cq_, this);
-            }
-            else if (status_ == PROCESS)
-            {
-                //new client
-                new PutKeyFunc(service_, storage_, cq_, thread_id);
-
-                // The actual processing.
-                storage_->writer_lock();
-                storage_->handle_put(request_.key(), request_.value());
-                storage_->writer_unlock();
-                reply_.set_status(200);
-                reply_.set_key(request_.key());
-                reply_.set_value(request_.value());
-
-                reply_.set_timestamp(request_.timestamp());
-
-                status_ = FINISH;
-                responder_.Finish(reply_, Status::OK, this);
-            }
-            else
-            {
-                GPR_ASSERT(status_ == FINISH);
-                delete this;
-            }
-        }
-
-    private:
-        KVStore::AsyncService *service_;
-        ServerCompletionQueue *cq_;
-        ServerContext ctx_;
-        Storage *storage_;
-
-        KeyValueRequest request_;
-        KeyValueReply reply_;
-
-        int thread_id;
-        ServerAsyncResponseWriter<KeyValueReply> responder_;
-
-        enum CallStatus
-        {
-            CREATE,
-            PROCESS,
-            FINISH
-        };
-        CallStatus status_;
-    };
-
-    class DeleteKeyFunc final : public CallData
-    {
-    public:
-        DeleteKeyFunc(KVStore::AsyncService *service, Storage *storage, ServerCompletionQueue *cq, int thread_id_)
-            : service_(service), storage_(storage), cq_(cq), responder_(&ctx_), status_(CREATE), thread_id(thread_id_)
-        {
-            Proceed();
-        }
-
-        void Proceed()
-        {
-            if (status_ == CREATE)
-            {
-                status_ = PROCESS;
-
-                service_->RequestDeleteKey(&ctx_, &request_, &responder_, cq_, cq_, this);
-            }
-            else if (status_ == PROCESS)
-            {
-                //new client
-                new DeleteKeyFunc(service_, storage_, cq_, thread_id);
-
-                // The actual processing.
-                storage_->writer_lock();
-                string result = storage_->handle_delete(request_.key());
-                storage_->writer_unlock();
-                if (!result.compare("ERROR"))
-                {
-                    reply_.set_message("KEY DOES NOT EXISTS");
-                    reply_.set_status(400);
-                }
-                else
-                {
-                    reply_.set_status(200);
-                    reply_.set_key(request_.key());
-                }
-
-                reply_.set_timestamp(request_.timestamp());
-
-                status_ = FINISH;
-                responder_.Finish(reply_, Status::OK, this);
-            }
-            else
-            {
-                GPR_ASSERT(status_ == FINISH);
-                delete this;
-            }
-        }
-
-    private:
-        KVStore::AsyncService *service_;
-        ServerCompletionQueue *cq_;
-        ServerContext ctx_;
-        Storage *storage_;
-
-        KeyRequest request_;
-        KeyValueReply reply_;
-
-        int thread_id;
-        ServerAsyncResponseWriter<KeyValueReply> responder_;
-
-        enum CallStatus
-        {
-            CREATE,
-            PROCESS,
-            FINISH
-        };
-        CallStatus status_;
-    };
-
-    // This can be run in multiple threads if needed.
-    void HandleRpcs(int thread_id)
-    {
-        new GetKeyFunc(&service_, &storage_, cq_[thread_id].get(), thread_id);
-        new PutKeyFunc(&service_, &storage_, cq_[thread_id].get(), thread_id);
-        new DeleteKeyFunc(&service_, &storage_, cq_[thread_id].get(), thread_id);
-
-        void *tag;
-        bool ok;
-        while (true)
-        {
-            // cout << "In Handle " << thread_id << endl;
-            GPR_ASSERT(cq_[thread_id]->Next(&tag, &ok));
-            GPR_ASSERT(ok);
-            static_cast<CallData *>(tag)->Proceed();
-        }
+        return Status::OK;
     }
 
-    unique_ptr<ServerCompletionQueue> *cq_;
-    KVStore::AsyncService service_;
-    unique_ptr<Server> server_;
+    Status PutKey(ServerContext *context, const KeyValueRequest *request, KeyValueReply *reply) override
+    {
+        storage_.writer_lock();
+        storage_.handle_put(request->key(), request->value());
+        storage_.writer_unlock();
+        reply->set_status(200);
+        reply->set_key(request->key());
+        reply->set_value(request->value());
+
+        reply->set_timestamp(request->timestamp());
+
+        return Status::OK;
+    }
+
+    Status DeleteKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
+    {
+        storage_.writer_lock();
+        string result = storage_.handle_delete(request->key());
+        storage_.writer_unlock();
+        if (!result.compare("ERROR"))
+        {
+            reply->set_message("KEY DOES NOT EXISTS");
+            reply->set_status(400);
+        }
+        else
+        {
+            reply->set_status(200);
+            reply->set_key(request->key());
+        }
+
+        reply->set_timestamp(request->timestamp());
+
+        return Status::OK;
+    }
+
     Storage storage_;
 };
 
+void joinServer()
+{
+    char ch;
+    cout << "\nWant to join the network(y/n): ";
+    cin >> ch;
+
+    if (ch == 'y')
+    {
+        string serverToJoin;
+        cout << "\nEnter port no. of server to join: ";
+        cin >> serverToJoin;
+        string addr("localhost:" + serverToJoin);
+        ServerSender comm(
+            grpc::CreateChannel(addr, grpc::InsecureChannelCredentials()));
+
+        int id = 69;
+
+        string rep = comm.Join("localhost", serverToJoin, id);
+        cout << "received: " << rep << endl;
+    }
+}
+
+void RunServer(const string &port)
+{
+
+    ifstream f_config;
+    f_config.open("config.txt");
+    string portno;
+    getline(f_config, portno);
+    string server_address("0.0.0.0:" + port);
+
+    string line;
+    getline(f_config, line);
+    getline(f_config, line);
+    getline(f_config, line);
+    stringstream ss(line);
+    ss >> THREADPOOL_SIZE;
+    cout << "Threadpool size: " << THREADPOOL_SIZE << endl;
+    
+    ServerImpl keyService;
+    ServerReceiver serverCommService;
+
+    grpc::EnableDefaultHealthCheckService(true);
+    grpc::reflection::InitProtoReflectionServerBuilderPlugin();
+    ServerBuilder builder;
+
+    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+
+    builder.RegisterService(&keyService);
+    builder.RegisterService(&serverCommService);
+
+    unique_ptr<Server> server(builder.BuildAndStart());
+    cout << "Server listening on " << server_address << endl;
+
+    joinServer();
+
+    server->Wait();
+}
+
 int main(int argc, char **argv)
 {
-    ServerImpl server;
     int file = open("log.txt", O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     dup2(file, fileno(stderr));
-    server.Run();
+
+    string portno;
+    cout << "Server port no.: ";
+    cin >> portno;
+
+    RunServer(portno);
 
     return 0;
 }

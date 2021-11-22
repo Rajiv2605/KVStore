@@ -53,8 +53,8 @@ public:                   // later move variables to private (public for ease of
         stringstream ss(line);
 
         ss >> cache_set;
-        cout << "cache_set " << cache_set << endl;
-        cout << "policy " << policy << endl;
+        cout << "# of cache sets: " << cache_set << endl;
+        cout << "cache replacement policy: " << policy << endl;
         for (int i = 0; i < 10; i++)
         {
             string name = "keydb" + to_string(i) + ".txt";

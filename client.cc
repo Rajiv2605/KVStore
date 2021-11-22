@@ -152,14 +152,14 @@ int main(int argc, char **argv)
 
     int option;
 
-    cout << "Interactive Mode - press 1 \nBatch Mode - press 2\nEnter valid option:";
+    cout << "Interactive Mode - press 1 \nBatch Mode - press 2\n\nEnter valid option:";
     cin >> option;
 
     if (option == 1)
     {
         while (true)
         {
-            cout << "Enter a valid command: ";
+            cout << "\nEnter a valid command: ";
             string type, key, value;
             cin >> type;
             if (!type.compare("GET"))
@@ -233,6 +233,11 @@ int main(int argc, char **argv)
 
         for (auto i{0}; i < worker_threads.size(); i++)
             worker_threads[i].join();
+    }
+    else
+    {
+        cout<<"Invalid input";
+        exit(1);
     }
 
     thread_.join(); // blocks forever

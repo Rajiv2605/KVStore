@@ -14,7 +14,11 @@
 #include "keyvalue.grpc.pb.h"
 #include "storage.hpp"
 
+#include "sha1.cpp"
+
 int THREADPOOL_SIZE = 4;
+string fhsh = "  ";
+string server_hash;
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -39,7 +43,7 @@ public:
     ServerSender(std::shared_ptr<Channel> channel)
         : stub_(ServerComm::NewStub(channel)) {}
 
-    string Join(const string &ip, const string &port, const int &id)
+    string Join(const string &ip, const string &port, const string &id)
     {
         JoinRequest request;
         request.set_ip(ip);
@@ -82,66 +86,72 @@ class ServerReceiver final : public ServerComm::Service
 
 class ServerImpl final : public KVStore::Service
 {
-    Status GetKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
-    {
-        storage_.reader_lock();
-        string result = storage_.handle_get(request->key());
-        storage_.reader_unlock();
-        if (!result.compare("ERROR"))
+    public:
+        ServerImpl(string server_id)
         {
-            reply->set_message("KEY DOES NOT EXISTS");
-            reply->set_status(400);
+            storage_.set_server_id(server_id);
+            storage_.create_db();
         }
-        else
+        Status GetKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
         {
-            reply->set_status(200);
-            reply->set_value(result);
-            reply->set_key(request->key());
+            storage_.reader_lock();
+            string result = storage_.handle_get(request->key());
+            storage_.reader_unlock();
+            if (!result.compare("ERROR"))
+            {
+                reply->set_message("KEY DOES NOT EXISTS");
+                reply->set_status(400);
+            }
+            else
+            {
+                reply->set_status(200);
+                reply->set_value(result);
+                reply->set_key(request->key());
+            }
+            reply->set_timestamp(request->timestamp());
+
+            return Status::OK;
         }
-        reply->set_timestamp(request->timestamp());
 
-        return Status::OK;
-    }
-
-    Status PutKey(ServerContext *context, const KeyValueRequest *request, KeyValueReply *reply) override
-    {
-        storage_.writer_lock();
-        storage_.handle_put(request->key(), request->value());
-        storage_.writer_unlock();
-        reply->set_status(200);
-        reply->set_key(request->key());
-        reply->set_value(request->value());
-
-        reply->set_timestamp(request->timestamp());
-
-        return Status::OK;
-    }
-
-    Status DeleteKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
-    {
-        storage_.writer_lock();
-        string result = storage_.handle_delete(request->key());
-        storage_.writer_unlock();
-        if (!result.compare("ERROR"))
+        Status PutKey(ServerContext *context, const KeyValueRequest *request, KeyValueReply *reply) override
         {
-            reply->set_message("KEY DOES NOT EXISTS");
-            reply->set_status(400);
-        }
-        else
-        {
+            storage_.writer_lock();
+            storage_.handle_put(request->key(), request->value());
+            storage_.writer_unlock();
             reply->set_status(200);
             reply->set_key(request->key());
+            reply->set_value(request->value());
+
+            reply->set_timestamp(request->timestamp());
+
+            return Status::OK;
         }
 
-        reply->set_timestamp(request->timestamp());
+        Status DeleteKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
+        {
+            storage_.writer_lock();
+            string result = storage_.handle_delete(request->key());
+            storage_.writer_unlock();
+            if (!result.compare("ERROR"))
+            {
+                reply->set_message("KEY DOES NOT EXISTS");
+                reply->set_status(400);
+            }
+            else
+            {
+                reply->set_status(200);
+                reply->set_key(request->key());
+            }
 
-        return Status::OK;
-    }
+            reply->set_timestamp(request->timestamp());
 
-    Storage storage_;
+            return Status::OK;
+        }
+    private:
+        Storage storage_;
 };
 
-void joinServer()
+void joinServer(string id)
 {
     char ch;
     cout << "\nWant to join the network(y/n): ";
@@ -156,11 +166,23 @@ void joinServer()
         ServerSender comm(
             grpc::CreateChannel(addr, grpc::InsecureChannelCredentials()));
 
-        int id = 69;
-
         string rep = comm.Join("localhost", serverToJoin, id);
         cout << "received: " << rep << endl;
     }
+}
+
+// Reference: https://stackoverflow.com/questions/8029121/how-to-hash-stdstring
+string generate_hash(string server_address)
+{
+    string hsh = sha1(server_address);
+	// hash<string> hasher;
+	// size_t hash = hasher(server_address);
+	// hash = hash%100;
+    // string hsh = to_string(hash);
+    fhsh[0] = hsh[0];
+    fhsh[1] = hsh[1];
+    cout<<"hash ID: "<<fhsh<<endl;
+	return fhsh;
 }
 
 void RunServer(const string &port)
@@ -180,7 +202,8 @@ void RunServer(const string &port)
     ss >> THREADPOOL_SIZE;
     cout << "Threadpool size: " << THREADPOOL_SIZE << endl;
     
-    ServerImpl keyService;
+    server_hash = generate_hash(server_address);
+    ServerImpl keyService(server_hash);
     ServerReceiver serverCommService;
 
     grpc::EnableDefaultHealthCheckService(true);
@@ -195,7 +218,7 @@ void RunServer(const string &port)
     unique_ptr<Server> server(builder.BuildAndStart());
     cout << "Server listening on " << server_address << endl;
 
-    joinServer();
+    joinServer(server_hash);
 
     server->Wait();
 }

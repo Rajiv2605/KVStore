@@ -18,7 +18,7 @@ service ServerComm {
 message JoinRequest {
   string ip = 1;
   string port = 2;
-  int64 id = 3;
+  string id = 3;
 }
 
 message JoinReply {

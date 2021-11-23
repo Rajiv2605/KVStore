@@ -39,9 +39,9 @@ message Keyval {
   string value = 2;
 }
 
-message KVCollection {
-  repeated Keyval kv_vals;
-}
+// message KVCollection {
+//   repeated Keyval kv_vals;
+// }
 
 message KeyRequest {
   string key = 1;

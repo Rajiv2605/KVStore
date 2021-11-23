@@ -19,8 +19,8 @@
 
 int THREADPOOL_SIZE = 4;
 string fhsh = "  ";
-string server_hash;
-map<string, string> id_port;
+int server_hash;
+map<int, string> id_port;
 string portno;
 
 using grpc::Channel;
@@ -48,7 +48,7 @@ public:
     ServerSender(std::shared_ptr<Channel> channel)
         : stub_(ServerComm::NewStub(channel)) {}
 
-    string Join(const string &ip, const string &port, const string &id)
+    string Join(const string &ip, const string &port, const int &id)
     {
         JoinRequest request;
         request.set_id(id);
@@ -97,7 +97,7 @@ class ServerReceiver final : public ServerComm::Service
 {
     Status Join(ServerContext *context, const JoinRequest *request, JoinReply *reply) override
     {
-        for(map<string, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
+        for(map<int, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
         {
             IdPortMessage *idp = reply->add_id_port();
             idp->set_id(i->first);
@@ -123,8 +123,18 @@ class ServerReceiver final : public ServerComm::Service
     {
         cout<<"Received broadcast from: "<<request->id()<<" "<<request->port()<<endl;
         id_port[request->id()] = request->port();
-        string msg = "Received at: " + server_hash + ", port: " + portno;
+        string msg = "Received at: " + to_string(server_hash) + ", port: " + portno;
         reply->set_message(msg);
+        cout<<"\nIP table:\n";
+        for(map<int, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
+        {
+            // string pno = i->second;
+            // if(pno == portno)
+            //     continue;
+            cout<<"ID:  "<<i->first<<"  port:   "<<i->second<<endl;
+        }
+        cout.flush();
+
         return Status::OK;
     }
 };
@@ -133,19 +143,7 @@ class ServerReceiver final : public ServerComm::Service
 class ServerImpl final : public KVStore::Service
 {
     public:
-    ServerImpl(string server_id)
-    {
-        storage_.set_server_id(server_id);
-        storage_.create_db();
-    }
-    
-    Status GetKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
-    {
-        storage_.reader_lock();
-        string result = storage_.handle_get(request->key());
-        storage_.reader_unlock();
-        if (!result.compare("ERROR"))
-
+        ServerImpl(int server_id)
         {
             storage_.set_server_id(server_id);
             storage_.create_db();
@@ -209,23 +207,7 @@ class ServerImpl final : public KVStore::Service
         Storage storage_;
 };
 
-class KeyRequest
-{
-    public:
-        KeyRequest(std::shared_ptr<Channel> channel)
-            : stub_(ServerComm::NewStub(channel)) {}
-        void Share_key(const string &id)
-        {
-            
-        }
-};
-
-class KeyResponse final : public KVStore::Service
-{
-
-}
-
-void joinServer(string id)
+void joinServer(int id)
 {
     char ch;
     cout << "\nWant to join the network(y/n): ";
@@ -243,7 +225,7 @@ void joinServer(string id)
         string rep = comm.Join("localhost", serverToJoin, id);
         cout << "received: " << rep << endl;
 
-        for(map<string, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
+        for(map<int, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
         {
             string pno = i->second;
             if(pno == portno)
@@ -258,7 +240,7 @@ void joinServer(string id)
 }
 
 // Reference: https://stackoverflow.com/questions/8029121/how-to-hash-stdstring
-string generate_hash(string server_address)
+int generate_hash(string server_address)
 {
     string hsh = sha1(server_address);
 	// hash<string> hasher;
@@ -267,8 +249,16 @@ string generate_hash(string server_address)
     // string hsh = to_string(hash);
     fhsh[0] = hsh[0];
     fhsh[1] = hsh[1];
-    cout<<"hash ID: "<<fhsh<<endl;
-	return fhsh;
+    
+    unsigned int x;   
+    stringstream ss;
+    ss << hex << fhsh;
+    ss >> x;
+    
+    // fhsh = to_string(x);
+    cout<<"hash ID: "<< x <<endl;
+
+	return x;
 }
 
 void RunServer(const string &port)

@@ -32,7 +32,7 @@ public:                   // later move variables to private (public for ease of
     };
 
     // lock related
-    string id;
+    int id;
     int readers = 0;
     int writers = false;
     mutex m;
@@ -79,7 +79,7 @@ public:                   // later move variables to private (public for ease of
         //   f_log.close();
     }
 
-    void set_server_id(string sid)
+    void set_server_id(int sid)
     {
         id = sid;
     }
@@ -88,7 +88,7 @@ public:                   // later move variables to private (public for ease of
     {
         for (int i = 0; i < 10; i++)
         {
-            string name = "keydb" + id + "_" + to_string(i) + ".txt";
+            string name = "keydb" + to_string(id) + "_" + to_string(i) + ".txt";
             f_db[i].open(name, ios::out | ios::app | ios::in);
         }
     }

@@ -17,7 +17,7 @@ service ServerComm {
 }
 
 message IdPortMessage {
-  string id = 1;
+  int64 id = 1;
   string port = 2;
 }
 
@@ -26,7 +26,7 @@ message IdResponse {
 }
 
 message JoinRequest {
-  string id = 1;
+  int64 id = 1;
   string port = 2; 
 }
 

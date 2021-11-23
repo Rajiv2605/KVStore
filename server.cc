@@ -263,6 +263,19 @@ int generate_hash(string server_address)
 
 void RunServer(const string &port)
 {
+    // find the successor node
+    map<string, string>::iterator i;
+    for(i=id_port.begin(); i!=id_port.end(); i++)
+    {
+        if(i->first > server_hash)
+            break;
+    }
+
+    // request k-v from the successor server
+}
+
+void RunServer(const string &port)
+{
     ifstream f_config;
     f_config.open("config.txt");
     string portno;
@@ -278,8 +291,10 @@ void RunServer(const string &port)
     cout << "Threadpool size: " << THREADPOOL_SIZE << endl;
     
     server_hash = generate_hash(server_address);
+
     ServerImpl keyService(server_hash);
     ServerReceiver serverCommService;
+    KeyResponse keyResponseService;
 
     // adding port number and id
     id_port[server_hash] = port;
@@ -292,11 +307,15 @@ void RunServer(const string &port)
 
     builder.RegisterService(&keyService);
     builder.RegisterService(&serverCommService);
+    builder.RegisterService();
 
     unique_ptr<Server> server(builder.BuildAndStart());
     cout << "Server listening on " << server_address << endl;
 
     joinServer(server_hash);
+
+    // find successor and retreive keys
+    get_keys();
 
     server->Wait();
 }

@@ -18,6 +18,11 @@
 
 #include "sha1.cpp"
 
+#define GET 1
+#define PUT 2
+#define DELETE 3
+
+
 struct finger_row{
     int start;
     int end;
@@ -53,6 +58,11 @@ using keyvalue::JoinRequest;
 using keyvalue::ServerComm;
 using keyvalue::IdPortMessage;
 using keyvalue::IdResponse;
+
+using keyvalue::DistRequest;
+using keyvalue::DistReply;
+
+Storage storage_;
 
 void print_finger_table(){
     cout << "\nFinger table : \n";
@@ -127,6 +137,32 @@ void update_key_range(){
         }
     }
 }
+
+class DistStoreSender
+{
+public:
+    DistStoreSender(std::shared_ptr<Channel> channel)
+        : stub_(KVStore::NewStub(channel)) {}
+
+    DistReply DistMethod(const int &key, const string &value, const int &type)
+    {
+        DistRequest request;
+        
+        request.set_type(type);
+        request.set_key(key);
+        request.set_value(value);
+
+        DistReply reply;
+        ClientContext context;
+        Status status = stub_->DistMethod(&context, request, &reply);
+        
+        return reply;
+    }
+
+private:
+    std::unique_ptr<KVStore::Stub> stub_;
+};
+
 
 class ServerSender
 {
@@ -228,11 +264,58 @@ class ServerReceiver final : public ServerComm::Service
 class ServerImpl final : public KVStore::Service
 {
     public:
-        ServerImpl(int server_id)
+    
+        Status DistMethod(ServerContext *context, const DistRequest *request, DistReply *reply) override
         {
-            storage_.set_server_id(server_id);
-            storage_.create_db();
+            if(key_range.start == key_range.end || (request->key() >= key_range.start && request->key() <= key_range.end))
+            {
+                if(request->type() == GET){
+                    storage_.reader_lock();
+                    string result = storage_.handle_get(to_string(request->key()));
+                    storage_.reader_unlock();
+                    if (!result.compare("ERROR"))
+                    {
+                        reply->set_message("KEY DOES NOT EXISTS");
+                        reply->set_success(0);
+                    }
+                    else
+                    {
+                        reply->set_success(1);
+                        reply->set_value(result);
+                        reply->set_key(request->key());
+                    }
+                    return Status::OK;
+                }
+                if(request->type() == PUT){
+                    storage_.writer_lock();
+                    storage_.handle_put(to_string(request->key()), request->value());
+                    storage_.writer_unlock();
+                    reply->set_success(1);
+                    reply->set_key(request->key());
+                    reply->set_value(request->value());
+                    return Status::OK;
+                }
+                if(request->type() == DELETE){
+                    storage_.writer_lock();
+                    string result = storage_.handle_delete(to_string(request->key()));
+                    storage_.writer_unlock();
+                    if (!result.compare("ERROR"))
+                    {
+                        reply->set_message("KEY DOES NOT EXISTS");
+                        reply->set_success(0);
+                    }
+                    else
+                    {
+                        reply->set_success(1);
+                        reply->set_key(request->key());
+                    }
+                    return Status::OK;
+                }
+            }
+            
+            return Status::OK;
         }
+
         Status GetKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
         {
             storage_.reader_lock();
@@ -288,8 +371,8 @@ class ServerImpl final : public KVStore::Service
 
             return Status::OK;
         }
-    private:
-        Storage storage_;
+    
+        
 };
 
 void joinServer(int id)
@@ -364,10 +447,11 @@ void RunServer(const string &port)
     
     server_hash = generate_hash(server_address);
 
-    ServerImpl keyService(server_hash);
+    ServerImpl keyService;
     ServerReceiver serverCommService;
     // KeyResponse keyResponseService;
-
+    storage_.set_server_id(server_hash);
+    storage_.create_db();
     // adding port number and id
     id_port[server_hash] = port;
 
@@ -390,7 +474,6 @@ void RunServer(const string &port)
         finger_table[i].start = (server_hash + int(pow(2,i)))% 256;
         finger_table[i].end = (server_hash + int(pow(2,i+1)) - 1)% 256;
         finger_table[i].succ = (server_hash);
-        cout << finger_table[i].start << "  "<<finger_table[i].end<< "  "<<finger_table[i].succ<< "  "<<finger_table[i].succ_port << endl;
     }
 
     key_range.start = server_hash;

@@ -9,11 +9,28 @@ service KVStore {
   rpc PutKey (KeyValueRequest) returns (KeyValueReply) {}
 
   rpc DeleteKey (KeyRequest) returns (KeyValueReply) {}
+
+  rpc DistMethod (DistRequest) returns (DistReply) {}
+
 }
 
 service ServerComm {
   rpc Join (JoinRequest) returns (JoinReply) {}
   rpc Share_key (IdPortMessage) returns (IdResponse) {}
+}
+
+message DistRequest {
+  int64 type = 1;
+  int64 key = 2;
+  string value = 3;
+}
+
+message DistReply {
+  int64 type = 1;
+  int64 key = 2;
+  string value = 3;
+  string message = 4;
+  int64 success = 5;
 }
 
 message IdPortMessage {

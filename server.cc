@@ -21,6 +21,7 @@ int THREADPOOL_SIZE = 4;
 string fhsh = "  ";
 string server_hash;
 map<string, string> id_port;
+string portno;
 
 using grpc::Channel;
 using grpc::ClientContext;
@@ -37,6 +38,8 @@ using keyvalue::KVStore;
 using keyvalue::JoinReply;
 using keyvalue::JoinRequest;
 using keyvalue::ServerComm;
+using keyvalue::IdPortMessage;
+using keyvalue::IdResponse;
 
 
 class ServerSender
@@ -63,8 +66,10 @@ public:
             cout<<"Size: "<<sz<<endl;
             for(int i=0; i<sz; i++)
             {
-                const keyvalue::IdPortMessage *msg = &reply.id_port(i);
+                const IdPortMessage *msg = &reply.id_port(i);
                 cout<<msg->id()<<" "<<msg->port()<<endl;
+                id_port[msg->id()] = msg->port();
+                Share_key(ip, msg->port());
             }
             return "Success!!\n";
         }
@@ -73,6 +78,16 @@ public:
             cout << status.error_code() << ": " << status.error_message() << endl;
             return "RPC failed";
         }
+    }
+
+    void Share_key(const string &ip, const string &port)
+    {
+        IdPortMessage request;
+        request.set_id(server_hash);
+        request.set_port(portno);
+        ClientContext context;
+        IdResponse reply;
+        Status status = stub_->Share_key(&context, request, &reply);
     }
 
 private:
@@ -85,7 +100,7 @@ class ServerReceiver final : public ServerComm::Service
     {
         for(map<string, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
         {
-            keyvalue::IdPortMessage *idp = reply->add_id_port();
+            IdPortMessage *idp = reply->add_id_port();
             idp->set_id(i->first);
             idp->set_port(i->second);
         }
@@ -102,6 +117,15 @@ class ServerReceiver final : public ServerComm::Service
         cout.flush();
         
         // reply->set_message("Successfully joined");
+        return Status::OK;
+    }
+
+    Status Share_key(ServerContext *context, const IdPortMessage *request, IdResponse *reply) override
+    {
+        cout<<"Received broadcast from: "<<request->id()<<" "<<request->port()<<endl;
+        id_port[request->id()] = request->port();
+        string msg = "Received at: " + server_hash + ", port: " + portno;
+        reply->set_message(msg);
         return Status::OK;
     }
 };
@@ -230,7 +254,6 @@ void RunServer(const string &port)
 
     // adding port number and id
     id_port[server_hash] = port;
-    id_port["!234"] = "hi";
 
     grpc::EnableDefaultHealthCheckService(true);
     grpc::reflection::InitProtoReflectionServerBuilderPlugin();
@@ -254,7 +277,6 @@ int main(int argc, char **argv)
     int file = open("log.txt", O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     dup2(file, fileno(stderr));
 
-    string portno;
     cout << "Server port no.: ";
     cin >> portno;
 

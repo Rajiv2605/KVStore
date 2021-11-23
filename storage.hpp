@@ -56,11 +56,6 @@ public:                   // later move variables to private (public for ease of
         ss >> cache_set;
         cout << "# of cache sets: " << cache_set << endl;
         cout << "cache replacement policy: " << policy << endl;
-        for (int i = 0; i < 10; i++)
-        {
-            string name = "keydb" + to_string(i) + ".txt";
-            f_db[i].open(name, ios::out | ios::app | ios::in);
-        }
         // f_log.open("log.txt", ios::out | ios::app | ios::in);
 
         for (int i = 0; i < cache_set; i++)

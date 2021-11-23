@@ -197,6 +197,22 @@ class ServerImpl final : public KVStore::Service
         Storage storage_;
 };
 
+class KeyRequest
+{
+    public:
+        KeyRequest(std::shared_ptr<Channel> channel)
+            : stub_(ServerComm::NewStub(channel)) {}
+        void Share_key(const string &id)
+        {
+            
+        }
+};
+
+class KeyResponse final : public KVStore::Service
+{
+
+}
+
 void joinServer(string id)
 {
     char ch;
@@ -243,6 +259,19 @@ string generate_hash(string server_address)
 	return fhsh;
 }
 
+void get_keys()
+{
+    // find the successor node
+    map<string, string>::iterator i;
+    for(i=id_port.begin(); i!=id_port.end(); i++)
+    {
+        if(i->first > server_hash)
+            break;
+    }
+
+    // request k-v from the successor server
+}
+
 void RunServer(const string &port)
 {
     ifstream f_config;
@@ -262,6 +291,7 @@ void RunServer(const string &port)
     server_hash = generate_hash(server_address);
     ServerImpl keyService(server_hash);
     ServerReceiver serverCommService;
+    KeyResponse keyResponseService;
 
     // adding port number and id
     id_port[server_hash] = port;
@@ -274,11 +304,15 @@ void RunServer(const string &port)
 
     builder.RegisterService(&keyService);
     builder.RegisterService(&serverCommService);
+    builder.RegisterService();
 
     unique_ptr<Server> server(builder.BuildAndStart());
     cout << "Server listening on " << server_address << endl;
 
     joinServer(server_hash);
+
+    // find successor and retreive keys
+    get_keys();
 
     server->Wait();
 }

@@ -69,7 +69,6 @@ public:
                 const IdPortMessage *msg = &reply.id_port(i);
                 cout<<msg->id()<<" "<<msg->port()<<endl;
                 id_port[msg->id()] = msg->port();
-                Share_key(ip, msg->port());
             }
             return "Success!!\n";
         }
@@ -215,6 +214,18 @@ void joinServer(string id)
 
         string rep = comm.Join("localhost", serverToJoin, id);
         cout << "received: " << rep << endl;
+
+        for(map<string, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
+        {
+            string pno = i->second;
+            if(pno == portno)
+                continue;
+
+            string addr("localhost:" + pno);
+            ServerSender comm(
+                grpc::CreateChannel(addr, grpc::InsecureChannelCredentials()));
+            comm.Share_key("localhost", pno);
+        }
     }
 }
 

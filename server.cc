@@ -133,7 +133,19 @@ class ServerReceiver final : public ServerComm::Service
 class ServerImpl final : public KVStore::Service
 {
     public:
-        ServerImpl(string server_id)
+    ServerImpl(string server_id)
+    {
+        storage_.set_server_id(server_id);
+        storage_.create_db();
+    }
+    
+    Status GetKey(ServerContext *context, const KeyRequest *request, KeyValueReply *reply) override
+    {
+        storage_.reader_lock();
+        string result = storage_.handle_get(request->key());
+        storage_.reader_unlock();
+        if (!result.compare("ERROR"))
+
         {
             storage_.set_server_id(server_id);
             storage_.create_db();
@@ -259,7 +271,7 @@ string generate_hash(string server_address)
 	return fhsh;
 }
 
-void get_keys()
+void RunServer(const string &port)
 {
     // find the successor node
     map<string, string>::iterator i;
@@ -289,6 +301,7 @@ void RunServer(const string &port)
     cout << "Threadpool size: " << THREADPOOL_SIZE << endl;
     
     server_hash = generate_hash(server_address);
+
     ServerImpl keyService(server_hash);
     ServerReceiver serverCommService;
     KeyResponse keyResponseService;

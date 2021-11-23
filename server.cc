@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include <sstream>
+#include <math.h>
 #include "unistd.h"
 
 #include <grpcpp/ext/proto_server_reflection_plugin.h>
@@ -16,6 +17,18 @@
 #include "storage.hpp"
 
 #include "sha1.cpp"
+
+struct finger_row{
+    int start;
+    int end;
+    int succ;
+    string succ_port;
+}finger_table[8];
+
+struct Key_range{
+    int start;
+    int end;
+} key_range;
 
 int THREADPOOL_SIZE = 4;
 string fhsh = "  ";
@@ -41,6 +54,79 @@ using keyvalue::ServerComm;
 using keyvalue::IdPortMessage;
 using keyvalue::IdResponse;
 
+void print_finger_table(){
+    cout << "\nFinger table : \n";
+    for(int i = 0; i < 8; i++)
+        cout << finger_table[i].start << "  "<<finger_table[i].end<< "  "<<finger_table[i].succ<< "  "<<finger_table[i].succ_port << endl;
+    cout.flush();
+
+}
+
+void print_key_range(){
+    cout << "\nKey Range : \n";
+    cout << key_range.start<<" - "<<key_range.end<< endl;
+    cout.flush();
+}
+
+
+
+void print_ip_table(){
+    cout<<"\nIP table:\n";
+    for(map<int, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
+    {
+        cout<<"ID:  "<<i->first<<"  port:   "<<i->second<<endl;
+    }
+    cout.flush();
+
+    return;
+}
+
+void update_finger_table(){
+    for(int i = 0; i < 8; i++){
+        int flag = 0;
+        for(map<int, string>::iterator j=id_port.begin(); j!=id_port.end(); j++)
+        {
+            if(j->first >= finger_table[i].start){
+                finger_table[i].succ = j->first;
+                finger_table[i].succ_port = j->second;
+                flag = 1;
+                break;
+            }
+        }
+        if(!flag){
+            for(map<int, string>::iterator j=id_port.begin(); j!=id_port.end(); j++)
+            {
+                finger_table[i].succ = j->first;
+                finger_table[i].succ_port = j->second;
+                break;
+            }   
+        }
+    }
+    print_finger_table();
+    return;
+}
+
+void update_key_range(){
+    map<int, string>::iterator itr;
+    itr = id_port.begin();
+    if(itr->first == server_hash){
+        itr = id_port.end();
+        itr--;
+        key_range.start = (itr->first) + 1;
+        print_key_range();
+        return;
+    }
+
+    for(itr=id_port.begin(); itr!=id_port.end(); itr++)
+    {
+        if(itr->first == server_hash){
+            itr--;
+            key_range.start = (itr->first) + 1;
+            print_key_range();
+            return;
+        }
+    }
+}
 
 class ServerSender
 {
@@ -70,6 +156,10 @@ public:
                 cout<<msg->id()<<" "<<msg->port()<<endl;
                 id_port[msg->id()] = msg->port();
             }
+            print_ip_table();
+
+            update_finger_table();
+            update_key_range();
             return "Success!!\n";
         }
         else
@@ -121,20 +211,15 @@ class ServerReceiver final : public ServerComm::Service
 
     Status Share_key(ServerContext *context, const IdPortMessage *request, IdResponse *reply) override
     {
-        cout<<"Received broadcast from: "<<request->id()<<" "<<request->port()<<endl;
+        // cout<<"Received broadcast from: "<<request->id()<<" "<<request->port()<<endl;
         id_port[request->id()] = request->port();
         string msg = "Received at: " + to_string(server_hash) + ", port: " + portno;
         reply->set_message(msg);
-        cout<<"\nIP table:\n";
-        for(map<int, string>::iterator i=id_port.begin(); i!=id_port.end(); i++)
-        {
-            // string pno = i->second;
-            // if(pno == portno)
-            //     continue;
-            cout<<"ID:  "<<i->first<<"  port:   "<<i->second<<endl;
-        }
-        cout.flush();
+        
+        // print_ip_table();
 
+        update_finger_table();
+        update_key_range();
         return Status::OK;
     }
 };
@@ -263,19 +348,6 @@ int generate_hash(string server_address)
 
 void RunServer(const string &port)
 {
-    // find the successor node
-    map<string, string>::iterator i;
-    for(i=id_port.begin(); i!=id_port.end(); i++)
-    {
-        if(i->first > server_hash)
-            break;
-    }
-
-    // request k-v from the successor server
-}
-
-void RunServer(const string &port)
-{
     ifstream f_config;
     f_config.open("config.txt");
     string portno;
@@ -294,7 +366,7 @@ void RunServer(const string &port)
 
     ServerImpl keyService(server_hash);
     ServerReceiver serverCommService;
-    KeyResponse keyResponseService;
+    // KeyResponse keyResponseService;
 
     // adding port number and id
     id_port[server_hash] = port;
@@ -307,15 +379,27 @@ void RunServer(const string &port)
 
     builder.RegisterService(&keyService);
     builder.RegisterService(&serverCommService);
-    builder.RegisterService();
+    // builder.RegisterService();
 
     unique_ptr<Server> server(builder.BuildAndStart());
     cout << "Server listening on " << server_address << endl;
 
+    cout << "Finger table : \n";
+    for(int i = 0; i < 8; i++)
+    {
+        finger_table[i].start = (server_hash + int(pow(2,i)))% 256;
+        finger_table[i].end = (server_hash + int(pow(2,i+1)) - 1)% 256;
+        finger_table[i].succ = (server_hash);
+        cout << finger_table[i].start << "  "<<finger_table[i].end<< "  "<<finger_table[i].succ<< "  "<<finger_table[i].succ_port << endl;
+    }
+
+    key_range.start = server_hash;
+    key_range.end = server_hash;
+
     joinServer(server_hash);
 
     // find successor and retreive keys
-    get_keys();
+    // get_keys();
 
     server->Wait();
 }

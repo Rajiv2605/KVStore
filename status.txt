@@ -1,0 +1,2 @@
+8-bit key instead of 16-bit key, for ease of use
+join server - brute force approach

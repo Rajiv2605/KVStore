@@ -57,7 +57,9 @@ using keyvalue::JoinReply;
 using keyvalue::JoinRequest;
 using keyvalue::ServerComm;
 using keyvalue::IdPortMessage;
+using keyvalue::KeyRequestRange;
 using keyvalue::IdResponse;
+using keyvalue::Keyval;
 using keyvalue::KVCollection;
 
 using keyvalue::DistRequest;
@@ -190,7 +192,7 @@ public:
             for(int i=0; i<sz; i++)
             {
                 const IdPortMessage *msg = &reply.id_port(i);
-                cout<<msg->id()<<" "<<msg->port()<<endl;
+                // cout<<msg->id()<<" "<<msg->port()<<endl;
                 id_port[msg->id()] = msg->port();
             }
             print_ip_table();
@@ -219,12 +221,26 @@ public:
     void Share_key(const int &id)
     {
         ClientContext context;
-        IdPortMessage request;
+        KeyRequestRange request;
         KVCollection reply;
         
         request.set_id(server_hash);
+        request.set_start(key_range.start);
+        request.set_end(key_range.end);
         
         Status status = stub_->Share_key(&context, request, &reply);
+
+        if(status.ok())
+        {
+            int sz = reply.kv_vals_size();
+            for(int i=0; i<sz; i++)
+            {
+                const Keyval *kv = &reply.kv_vals(i);
+                storage_.handle_put(kv->key(), kv->value());
+            }
+        }
+        else
+            cout<<"Share_key() request failed"<<endl;
     }
 
 private:
@@ -271,10 +287,28 @@ class ServerReceiver final : public ServerComm::Service
         return Status::OK;
     }
 
-    Status Share_key(ServerContext *context, const IdPortMessage *request, KVCollection *reply)
+    Status Share_key(ServerContext *context, const KeyRequestRange *request, KVCollection *reply)
     {
-        // cout<<"Received request from: "<<request->id()<<endl;
-        
+        cout<<"Received request from: "<<request->id()<<endl;
+        Keyval *curr;
+        for(int i = request->start(); i <= request->end(); i++)
+        {
+            storage_.reader_lock();
+            string result = storage_.handle_get(to_string(i));
+            storage_.reader_unlock();
+
+        //     // check if there is a hit in the DB
+            if(!result.compare("ERROR"))
+                continue;
+            else
+            {
+                // add k-v to the KVCollection reply
+                curr = reply->add_kv_vals();
+                curr->set_key(to_string(request->id()));
+                curr->set_value(result);
+            }
+        }
+
         return Status::OK;
     }    
 };

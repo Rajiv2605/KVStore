@@ -68,7 +68,7 @@ using keyvalue::DistReply;
 Storage storage_;
 
 void print_finger_table(){
-    cout << "\nFinger table : \n";
+    cout << "\nFinger table : \n\nstart   end   successor   port\n";
     for(int i = 0; i < 8; i++)
         cout << finger_table[i].start << "  "<<finger_table[i].end<< "  "<<finger_table[i].succ<< "  "<<finger_table[i].succ_port << endl;
     cout.flush();
@@ -195,7 +195,7 @@ public:
                 // cout<<msg->id()<<" "<<msg->port()<<endl;
                 id_port[msg->id()] = msg->port();
             }
-            print_ip_table();
+            // print_ip_table();
 
             update_finger_table();
             update_key_range();
@@ -290,24 +290,39 @@ class ServerReceiver final : public ServerComm::Service
     Status Share_key(ServerContext *context, const KeyRequestRange *request, KVCollection *reply)
     {
         cout<<"Received request from: "<<request->id()<<endl;
+
+        cout<<"Key transfer start\n";
         Keyval *curr;
-        for(int i = request->start(); i <= request->end(); i++)
-        {
+        int start = request->start();
+        int end = request->end() + 1;
+
+        cout<<start<<" "<<end<<endl;
+        while(start != end){
             storage_.reader_lock();
-            string result = storage_.handle_get(to_string(i));
+            string result = storage_.handle_get(to_string(start));
             storage_.reader_unlock();
 
-        //     // check if there is a hit in the DB
-            if(!result.compare("ERROR"))
+        // check if there is a hit in the DB
+            if(!result.compare("ERROR")){
+                start = (start + 1) % 256;
                 continue;
+            }
             else
             {
+                storage_.handle_delete(to_string(start));
                 // add k-v to the KVCollection reply
                 curr = reply->add_kv_vals();
-                curr->set_key(to_string(request->id()));
+                curr->set_key(to_string(start));
                 curr->set_value(result);
+                start = (start + 1) % 256;
+                
             }
         }
+
+
+        cout<<"End of key transfer start\n";
+        print_finger_table();
+        print_key_range();
 
         return Status::OK;
     }    
@@ -320,7 +335,22 @@ class ServerImpl final : public KVStore::Service
     
         Status DistMethod(ServerContext *context, const DistRequest *request, DistReply *reply) override
         {
-            if(key_range.start == key_range.end || (request->key() >= key_range.start && request->key() <= key_range.end))
+            int flag = 0;
+            if(key_range.start > key_range.end)
+            {
+                if(request->key() > key_range.end && request->key() < key_range.start)
+                    flag = 0;    
+                else
+                    flag = 1;
+            }
+            else
+            {
+                if(request->key() >= key_range.start && request->key() <= key_range.end)
+                    flag = 1;
+            }
+
+
+            if(key_range.start == key_range.end || flag == 1)
             {
                 if(request->type() == GET){
                     storage_.reader_lock();
@@ -366,6 +396,42 @@ class ServerImpl final : public KVStore::Service
                 }
             }
             
+            else {
+                DistReply replyFromServer;
+                for(int i = 0; i < 8; i++)
+                {
+                    int flag1 = 0;
+                    if(finger_table[i].start > finger_table[i].end)
+                    {
+                        if(request->key() > finger_table[i].end && request->key() < finger_table[i].start)
+                            flag1 = 0;    
+                        else
+                            flag1 = 1;
+                    }
+                    else
+                    {
+                        if(request->key() >= finger_table[i].start && request->key() <= finger_table[i].end)
+                            flag1 = 1;
+                    }
+
+                    if(flag1 == 1)
+                    {
+                        cout<<"\nForward request to server ID: "<<finger_table[i].succ<<"   ,   port: "<<finger_table[i].succ_port<<endl;
+                        string addr("localhost:" + finger_table[i].succ_port);
+                        DistStoreSender distStoreSender(
+                            grpc::CreateChannel(addr, grpc::InsecureChannelCredentials()));
+                        
+                        replyFromServer = distStoreSender.DistMethod(request->key(), request->value(), request->type());
+                        reply->set_key(replyFromServer.key());
+                        reply->set_value(replyFromServer.value());
+                        reply->set_message(replyFromServer.message());
+                        reply->set_success(replyFromServer.success());
+                        reply->set_type(replyFromServer.type());
+                        
+                        break;    
+                    }
+                }
+            }
             return Status::OK;
         }
 

@@ -58,6 +58,7 @@ using keyvalue::JoinRequest;
 using keyvalue::ServerComm;
 using keyvalue::IdPortMessage;
 using keyvalue::IdResponse;
+using keyvalue::KVCollection;
 
 using keyvalue::DistRequest;
 using keyvalue::DistReply;
@@ -205,13 +206,24 @@ public:
         }
     }
 
-    void Share_key(const string &ip, const string &port)
+    void Share_id(const string &ip, const string &port)
     {
         IdPortMessage request;
         request.set_id(server_hash);
         request.set_port(portno);
         ClientContext context;
         IdResponse reply;
+        Status status = stub_->Share_id(&context, request, &reply);
+    }
+
+    void Share_key(const int &id)
+    {
+        ClientContext context;
+        IdPortMessage request;
+        KVCollection reply;
+        
+        request.set_id(server_hash);
+        
         Status status = stub_->Share_key(&context, request, &reply);
     }
 
@@ -245,7 +257,7 @@ class ServerReceiver final : public ServerComm::Service
         return Status::OK;
     }
 
-    Status Share_key(ServerContext *context, const IdPortMessage *request, IdResponse *reply) override
+    Status Share_id(ServerContext *context, const IdPortMessage *request, IdResponse *reply) override
     {
         // cout<<"Received broadcast from: "<<request->id()<<" "<<request->port()<<endl;
         id_port[request->id()] = request->port();
@@ -258,6 +270,13 @@ class ServerReceiver final : public ServerComm::Service
         update_key_range();
         return Status::OK;
     }
+
+    Status Share_key(ServerContext *context, const IdPortMessage *request, KVCollection *reply)
+    {
+        // cout<<"Received request from: "<<request->id()<<endl;
+        
+        return Status::OK;
+    }    
 };
 
 
@@ -402,7 +421,7 @@ void joinServer(int id)
             string addr("localhost:" + pno);
             ServerSender comm(
                 grpc::CreateChannel(addr, grpc::InsecureChannelCredentials()));
-            comm.Share_key("localhost", pno);
+            comm.Share_id("localhost", pno);
         }
     }
 }
@@ -427,6 +446,30 @@ int generate_hash(string server_address)
     cout<<"hash ID: "<< x <<endl;
 
 	return x;
+}
+
+void get_keys()
+{
+    // find the successor node
+    map<int, string>::iterator i;
+    for(i=id_port.begin(); i!=id_port.end(); i++)
+    {
+        if(i->first > server_hash)
+            break;
+    }
+
+    if(i==id_port.end())
+        i = id_port.begin();
+
+    // request k-v from the successor server
+    if(i->first != server_hash)
+    {
+        string serverToJoin = id_port[i->first];
+        string addr("localhost:"+serverToJoin);
+        ServerSender comm(
+            grpc::CreateChannel(addr, grpc::InsecureChannelCredentials()));
+        comm.Share_key(i->first);
+    }
 }
 
 void RunServer(const string &port)
@@ -482,7 +525,7 @@ void RunServer(const string &port)
     joinServer(server_hash);
 
     // find successor and retreive keys
-    // get_keys();
+    get_keys();
 
     server->Wait();
 }

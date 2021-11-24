@@ -16,7 +16,8 @@ service KVStore {
 
 service ServerComm {
   rpc Join (JoinRequest) returns (JoinReply) {}
-  rpc Share_key (IdPortMessage) returns (IdResponse) {}
+  rpc Share_id (IdPortMessage) returns (IdResponse) {}
+  rpc Share_key (IdPortMessage) returns (KVCollection) {}
 }
 
 message DistRequest {
@@ -56,9 +57,9 @@ message Keyval {
   string value = 2;
 }
 
-// message KVCollection {
-//   repeated Keyval kv_vals;
-// }
+message KVCollection {
+  repeated Keyval kv_vals = 1;
+}
 
 message KeyRequest {
   string key = 1;

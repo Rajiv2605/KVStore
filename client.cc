@@ -86,21 +86,29 @@ int main(int argc, char **argv)
             {
                 cin >> key;
                 DistReply reply = distStoreSender.DistMethod(key, "", GET);
-                cout<<reply.message()<<endl;
-                cout<<reply.key()<<endl;
-                cout<<reply.value()<<endl;
-                cout<<reply.success()<<endl;
+                cout<<"Message: "<<reply.message()<<endl;
+                cout<<"Key: "<<reply.key()<<endl;
+                cout<<"Value: "<<reply.value()<<endl;
+                cout<<"Success: "<<reply.success()<<endl;
             }
             else if (!type.compare("PUT"))
             {
                 cin >> key;
                 cin >> value;
-                distStoreSender.DistMethod(key, value, PUT);
+                DistReply reply = distStoreSender.DistMethod(key, value, PUT);
+                cout<<"Message: "<<reply.message()<<endl;
+                cout<<"Key: "<<reply.key()<<endl;
+                cout<<"Value: "<<reply.value()<<endl;
+                cout<<"Success: "<<reply.success()<<endl;
             }
             else if (!type.compare("DELETE"))
             {
                 cin >> key;
-                distStoreSender.DistMethod(key, "", DELETE);
+                DistReply reply = distStoreSender.DistMethod(key, "", DELETE);
+                cout<<"Message: "<<reply.message()<<endl;
+                cout<<"Key: "<<reply.key()<<endl;
+                cout<<"Value: "<<reply.value()<<endl;
+                cout<<"Success: "<<reply.success()<<endl;
             }
             else
             {
